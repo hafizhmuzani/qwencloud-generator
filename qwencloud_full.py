@@ -109,16 +109,51 @@ def _wait_for_text(page, text: str, timeout: float = 30.0) -> bool:
     return False
 
 
+def _test_model(api_key: str, model: str, timeout: float = 20.0) -> bool:
+    """Test a chat-completions call against QwenCloud with the given key."""
+    import urllib.error
+    payload = json.dumps({
+        "model": model,
+        "messages": [{"role": "user", "content": "Hi"}],
+        "max_tokens": 10,
+    }).encode()
+    req = urllib.request.Request(
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions",
+        data=payload,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+    )
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        body = json.loads(resp.read().decode())
+        return bool(body.get("choices"))
+    except Exception:
+        return False
+
+
 def _connect_to_9router(email: str, api_key: str, result: dict) -> None:
     """Create a NEW QwenCloud connection slot in 9Router for each fresh account.
 
-    Scans existing QwenCloud connections (Qwen1, Qwen2, ...), picks the next
-    free slot name (Qwen4, Qwen5, ...) and INSERTs a brand-new connection.
-    Existing slots are never touched.
+    Tests qwen-flash-character and qwen-plus-character against the key FIRST;
+    only if both succeed does it INSERT a brand-new connection slot
+    (Qwen4, Qwen5, ...). Existing slots are never touched.
     Also saves to api_keys.txt and accounts.json.
     """
     import sqlite3
     import uuid
+
+    # Test both character models before touching 9Router
+    tested_ok = []
+    for model in ("qwen-flash-character", "qwen-plus-character"):
+        if _test_model(api_key, model):
+            tested_ok.append(model)
+        else:
+            warn(f"[{email}] model test FAILED: {model}")
+
+    if not tested_ok:
+        error(f"[{email}] BOTH model tests failed — skipping 9Router insert")
+        return
+
+    info(f"[{email}] model test OK ({', '.join(tested_ok)})")
 
     DB_PATH = Path.home() / "AppData/Roaming/9router/db/data.sqlite"
     if not DB_PATH.exists():
