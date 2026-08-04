@@ -85,6 +85,88 @@ def _wait_for_text(page, text: str, timeout: float = 30.0) -> bool:
     return False
 
 
+def _connect_to_9router(email: str, api_key: str, result: dict) -> None:
+    """Update 9Router SQLite database with new QwenCloud API key.
+    
+    Finds the Qwen3 connection (id: 982e817a...) in providerConnections
+    and replaces its API key with the freshly generated one.
+    Also saves to api_keys.txt and accounts.json.
+    """
+    import sqlite3
+    
+    DB_PATH = Path.home() / "AppData/Roaming/9router/db/data.sqlite"
+    if not DB_PATH.exists():
+        warn(f"9Router DB not found at {DB_PATH}")
+        return
+    
+    info(f"[{email}] Connecting to 9Router...")
+    
+    conn = sqlite3.connect(str(DB_PATH))
+    cursor = conn.cursor()
+    
+    # Find the QwenCloud "Qwen3" connection slot to replace
+    QWEN3_ID = "982e817a-b8cf-4a75-a0cf-b7f1cdae327b"
+    cursor.execute("SELECT id, data FROM providerConnections WHERE id=?", (QWEN3_ID,))
+    row = cursor.fetchone()
+    
+    if row:
+        # Update existing Qwen3 slot
+        data = json.loads(row[1])
+        data['apiKey'] = api_key
+        data['email'] = email
+        data['name'] = email
+        data['testStatus'] = 'pending'
+        data['lastError'] = None
+        data['errorCode'] = None
+        
+        cursor.execute(
+            "UPDATE providerConnections SET data=?, updatedAt=CURRENT_TIMESTAMP WHERE id=?",
+            (json.dumps(data), QWEN3_ID)
+        )
+        conn.commit()
+        info(f"[{email}] 9Router updated: Qwen3 slot → {email}")
+    else:
+        # Qwen3 slot not found, create a new connection
+        provider_id = "openai-compatible-chat-099c2f33-e34d-43e7-afcb-724d9c0c9d17"
+        new_id = str(__import__('uuid').uuid4())
+        data = {
+            "apiKey": api_key,
+            "email": email,
+            "defaultModel": None,
+            "testStatus": "pending",
+        }
+        cursor.execute(
+            "INSERT INTO providerConnections (id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            (new_id, provider_id, "apikey", email, email, 3, 1, json.dumps(data))
+        )
+        conn.commit()
+        info(f"[{email}] 9Router: new connection created for {email}")
+    
+    conn.close()
+    
+    # Save to api_keys.txt
+    keys_file = Path(__file__).parent / "api_keys.txt"
+    with open(keys_file, "a") as f:
+        f.write(f"{email}|{api_key}\n")
+    info(f"[{email}] Saved to api_keys.txt")
+    
+    # Save to accounts.json
+    accounts_file = Path(__file__).parent / "accounts.json"
+    accounts = {}
+    if accounts_file.exists():
+        accounts = json.loads(accounts_file.read_text())
+    accounts[email] = {
+        "email": email,
+        "status": "success",
+        "api_key": api_key,
+        "base_url_openai": result.get("base_url_openai", "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"),
+        "country": result.get("country", ""),
+        "updated_at": __import__('datetime').datetime.now().isoformat(),
+    }
+    accounts_file.write_text(json.dumps(accounts, indent=2, ensure_ascii=False))
+    info(f"[{email}] Saved to accounts.json")
+
+
 def _wait_for_url(page, pattern: str, timeout: float = 30.0) -> bool:
     """Poll for URL pattern every 1s."""
     deadline = _now() + timeout
@@ -1023,14 +1105,22 @@ def main():
                     browser.close()
                     return _result({"status": "success-no-key", "email": args.email})
             browser.close()
-            return _result({
+            result = {
                 "status": "success",
                 "email": args.email,
                 "api_key": api_key,
                 "base_url_openai": BASE_OPENAI,
                 "base_url_anthropic": BASE_ANTHROPIC,
                 "country": country,
-            })
+            }
+            
+            # 🔗 Auto-connect to 9Router with new API key
+            try:
+                _connect_to_9router(args.email, api_key, result)
+            except Exception as e:
+                warn(f"Failed to connect to 9Router: {e}")
+            
+            return result
         except Exception as e:
             try:
                 browser.close()
