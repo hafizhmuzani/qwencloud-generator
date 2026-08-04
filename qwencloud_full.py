@@ -20,9 +20,33 @@ from pathlib import Path
 from typing import Optional
 
 import gmail_auth
+import tempmail_client
 from logger import info, ok, warn, error
 
 # fmt: off
+FIRST_NAMES = [
+    "Ahmad", "Budi", "Citra", "Dewi", "Eko", "Fitri", "Gunawan", "Hesti",
+    "Indra", "Joko", "Kartika", "Lukman", "Maya", "Nanda", "Oscar", "Putri",
+    "Rizky", "Sari", "Teguh", "Umar", "Vina", "Wahyu", "Yuni", "Zaki",
+    "Aditya", "Bella", "Candra", "Dinda", "Eka", "Farhan", "Gita", "Hendra",
+    "Intan", "Jaka", "Kirana", "Laras", "Made", "Nadia", "Okta", "Pandu",
+    "Ratna", "Satria", "Tina", "Ucok", "Vania", "Wulan", "Yoga", "Zahra",
+]
+LAST_NAMES = [
+    "Pratama", "Wijaya", "Saputra", "Santoso", "Kurniawan", "Hidayat",
+    "Nugroho", "Susanto", "Ramadhan", "Firmansyah", "Hakim", "Yusuf",
+    "Maulana", "Rahman", "Putra", "Setiawan", "Kusuma", "Wibowo",
+    "Purnomo", "Utama", "Surya", "Agustian", "Fauzi", "Nurhadi",
+    "Subekti", "Lestari", "Anggraini", "Puspita", "Melati", "Cahyono",
+    "Wicaksono", "Siregar", "Nasution", "Sinaga", "Saragih", "Situmorang",
+]
+
+def _random_tempmail_email() -> str:
+    """Generate a random human-like email on the user's own domain (tempmail)."""
+    fn = random.choice(FIRST_NAMES)
+    ln = random.choice(LAST_NAMES)
+    num = random.randint(1, 999)
+    return f"{fn.lower()}.{ln.lower()}{num:03d}@hafizhmuzani.my.id"
 COUNTRIES = [
     "Indonesia", "Malaysia", "Singapore", "Thailand", "Philippines",
     "Vietnam", "United States", "United Kingdom", "Germany",
@@ -314,6 +338,18 @@ def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms:
     return None
 
 
+def _read_verification_code_tempmail(session_id: str, address: str, timeout: int = 90) -> Optional[str]:
+    """Poll tempmail API for QwenCloud verification code."""
+    info(f"[{address}] polling tempmail for verification code")
+    since_ms = int(time.time() * 1000) - 60000  # 60s before now
+    code = tempmail_client.wait_for_code(session_id, address, since_ms=since_ms, timeout=timeout, poll_interval=3.0)
+    if code:
+        info(f"[{address}] verification code found via tempmail: {code}")
+    else:
+        warn(f"[{address}] tempmail timeout ({timeout}s)")
+    return code
+
+
 def _safe_count(page, selector: str, limit: int = 10) -> int:
     for _ in range(limit):
         try:
@@ -438,9 +474,11 @@ def _select_country(page, country: str) -> bool:
         return False
 
 
-def _do_login(page, email: str) -> dict:
+def _do_login(page, email: str, tempmail_session: dict = None) -> dict:
     """Login via email + OTP. Reaches dashboard without country selection."""
     info(f"starting login (resume) for {email}")
+    if tempmail_session:
+        info(f"[{email}] login via tempmail inbox={tempmail_session['address']}")
     request_code_at_ms = int(time.time() * 1000) - 60000  # 60s clock skew tolerance
     try:
         page.get_by_role("textbox", name="Email").fill(email)
@@ -467,7 +505,10 @@ def _do_login(page, email: str) -> dict:
         return {"status": "error", "email": email, "reason": f"login-fill-failed: {e}"}
 
     # Poll for verification code (skip time filter for login to allow existing OTP)
-    code = _read_verification_code(email, timeout=90, min_internal_date_ms=request_code_at_ms, skip_time_filter=True)
+    if tempmail_session:
+        code = _read_verification_code_tempmail(tempmail_session['sessionId'], tempmail_session['address'], timeout=90)
+    else:
+        code = _read_verification_code(email, timeout=90, min_internal_date_ms=request_code_at_ms, skip_time_filter=True)
     if not code:
         return {"status": "error", "email": email, "reason": "login-verification-code-not-found"}
 
@@ -542,8 +583,10 @@ def _do_login(page, email: str) -> dict:
     return {"status": "login-ok" if dashboard_ok else "logged-in-session-started", "email": email, "needs_auth_check": not dashboard_ok}
 
 
-def _do_signup(page, email: str, country: str) -> dict:
+def _do_signup(page, email: str, country: str, tempmail_session: dict = None) -> dict:
     info(f"starting signup for {email}")
+    if tempmail_session:
+        info(f"[{email}] using tempmail mode (inbox={tempmail_session['address']})")
 
     # --- signup email page ---
     request_code_at_ms = int(time.time() * 1000) - 60000  # 60s clock skew tolerance
@@ -562,7 +605,7 @@ def _do_signup(page, email: str, country: str) -> dict:
     while _now() < deadline:
         try:
             body = page.evaluate("() => document.body.innerText").lower()
-            if "already" in body or "registered" in body:
+            if "already" in body and "registered" in body:
                 return {"status": "already-registered", "email": email}
             if "enter verification code" in body:
                 break
@@ -584,7 +627,10 @@ def _do_signup(page, email: str, country: str) -> dict:
     fresh_otp_timestamp = int(time.time() * 1000) - 120000  # 2 min buffer BEFORE now
     
     # Poll for FIRST OTP that should have arrived
-    code = _read_verification_code(email, timeout=30, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
+    if tempmail_session:
+        code = _read_verification_code_tempmail(tempmail_session['sessionId'], tempmail_session['address'], timeout=30)
+    else:
+        code = _read_verification_code(email, timeout=30, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
     
     if not code:
         # If no OTP yet, try clicking Resend (if enabled)
@@ -605,7 +651,10 @@ def _do_signup(page, email: str, country: str) -> dict:
                     continue
             
             # Poll for RESNED OTP
-            code = _read_verification_code(email, timeout=40, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
+            if tempmail_session:
+                code = _read_verification_code_tempmail(tempmail_session['sessionId'], tempmail_session['address'], timeout=40)
+            else:
+                code = _read_verification_code(email, timeout=40, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
             
         except Exception as e:
             info(f"[{email}] Resend failed: {e}")
@@ -875,16 +924,31 @@ def _create_api_key(page, description: str = "default") -> Optional[str]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--email", required=True)
+    parser.add_argument("--email", default="", help="Email to register (auto-generated in tempmail mode)")
     parser.add_argument("--proxy", default="")
     parser.add_argument("--country", default="")
     parser.add_argument("--api-key-desc", default="default")
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--api-timeout", type=int, default=120)
     parser.add_argument("--resume", action="store_true", help="Try login for already-registered accounts to harvest API key")
+    parser.add_argument("--tempmail", action="store_true", help="Use @hafizhmuzani.my.id tempmail for OTP (auto-generates random email if --email not given)")
     args = parser.parse_args()
 
     from playwright.sync_api import sync_playwright
+
+    # --- tempmail mode: create inbox + auto-generate email ---
+    tempmail_session = None
+    if args.tempmail:
+        args.email = args.email or _random_tempmail_email()
+        info(f"[{args.email}] creating tempmail inbox...")
+        tempmail_client.reset()  # fresh inbox per account (never reuse)
+        tempmail_session = tempmail_client.get_or_create_inbox()
+        # Override email with tempmail address
+        args.email = tempmail_session["address"]
+        info(f"[{args.email}] tempmail ready (session={tempmail_session['sessionId'][:12]}...)")
+
+    if not args.email:
+        parser.error("--email is required (or use --tempmail for auto-generation)")
 
     country = args.country or _random_country()
     info(f"QwenCloud bot | email={args.email} | country={country}")
@@ -1005,7 +1069,7 @@ def main():
                     return _result({"status": "error", "email": args.email, "reason": f"signup-page-not-found:url={url}:title={title}"})
             
             # Continue with signup flow from here
-            res = _do_signup(page, args.email, country)
+            res = _do_signup(page, args.email, country, tempmail_session=tempmail_session)
             if res["status"] == "already-registered":
                 info(f"[{args.email}] already-registered, trying login to harvest API key")
                 # On the SAME register page, look for "Log In" link instead of navigating to home
@@ -1066,7 +1130,7 @@ def main():
                         body_preview = page.evaluate("() => document.body.innerText.substring(0, 500)")
                         info(body_preview[:300])
                 
-                    login_res = _do_login(page, args.email)
+                    login_res = _do_login(page, args.email, tempmail_session=tempmail_session)
                     if login_res["status"] != "login-ok":
                         browser.close()
                         return _result({**login_res, "email": args.email})
@@ -1096,7 +1160,7 @@ def main():
                                     time.sleep(2)
                             except:
                                 pass
-                        login_res = _do_login(page, args.email)
+                        login_res = _do_login(page, args.email, tempmail_session=tempmail_session)
                         if login_res["status"] == "login-ok":
                             api_key = _create_api_key(page, args.api_key_desc)
                     except Exception as e:
@@ -1120,7 +1184,7 @@ def main():
             except Exception as e:
                 warn(f"Failed to connect to 9Router: {e}")
             
-            return result
+            return _result(result)
         except Exception as e:
             try:
                 browser.close()

@@ -188,13 +188,18 @@ def mask_email_local(email: str) -> str:
     return mask_email(email)
 
 
-def run_one(email: str, proxy: str, idx: int, total: int, headless: bool = False, args_resume: bool = False, worker_id: int = 0, censor: bool = False, verbose: bool = False, tui: TUI = None, self_mode: bool = False, nyx_mode: bool = False) -> str:
+def run_one(email: str, proxy: str, idx: int, total: int, headless: bool = False, args_resume: bool = False, worker_id: int = 0, censor: bool = False, verbose: bool = False, tui: TUI = None, self_mode: bool = False, nyx_mode: bool = False, tempmail_mode: bool = False) -> str:
     start = time.time()
     display_email = mask_email(email) if censor else email
     if tui:
         tui.update_worker(worker_id, "RUNNING", display_email, "signup...")
     python_exe = sys.executable or "python"
-    cmd = [python_exe, SCRIPT, "--email", email]
+    cmd = [python_exe, SCRIPT]
+    if tempmail_mode:
+        cmd.append("--tempmail")
+        display_email = f"tempmail-{idx}" if censor else f"tempmail-{idx}"
+    else:
+        cmd.extend(["--email", email])
     if not self_mode and not nyx_mode:
         proxy_url = to_proxy_url(proxy)
         probe = probe_proxy(proxy_url)
@@ -287,18 +292,21 @@ def run_one(email: str, proxy: str, idx: int, total: int, headless: bool = False
                 print(f"    {logger.dim(ln[:160])}", file=sys.stderr, flush=True)
 
     elapsed = time.time() - start
+    # In tempmail mode the actual email comes from subprocess output, not the (empty) param
+    actual_email = parsed.get("email", email) or email
+    display_email = mask_email(actual_email) if censor else actual_email
     if status == "success":
         api_key = parsed.get("api_key", "")
         base_url_openai = parsed.get("base_url_openai", "")
         country = parsed.get("country", "")
-        mark_account(email, "success", api_key=api_key, base_url_openai=base_url_openai, country=country)
-        append_api_key(email, api_key, base_url_openai)
+        mark_account(actual_email, "success", api_key=api_key, base_url_openai=base_url_openai, country=country)
+        append_api_key(actual_email, api_key, base_url_openai)
         if tui:
             tui.update_worker(worker_id, "SUCCESS", display_email, mask_key(api_key), elapsed)
         return "success"
 
     if status == "success-no-key":
-        mark_account(email, "success-no-key")
+        mark_account(actual_email, "success-no-key")
         if tui:
             tui.update_worker(worker_id, "BURNT", display_email, "no key", elapsed)
         return "success-no-key"
@@ -307,18 +315,18 @@ def run_one(email: str, proxy: str, idx: int, total: int, headless: bool = False
         api_key = parsed.get("api_key", "")
         if api_key:
             base_url_openai = parsed.get("base_url_openai", BASE_OPENAI_URL)
-            mark_account(email, "success", api_key=api_key, base_url_openai=base_url_openai)
-            append_api_key(email, api_key, base_url_openai)
+            mark_account(actual_email, "success", api_key=api_key, base_url_openai=base_url_openai)
+            append_api_key(actual_email, api_key, base_url_openai)
             if tui:
                 tui.update_worker(worker_id, "SUCCESS", display_email, mask_key(api_key), elapsed)
             return "success"
-        mark_account(email, "success-no-key")
+        mark_account(actual_email, "success-no-key")
         if tui:
             tui.update_worker(worker_id, "BURNT", display_email, "login no key", elapsed)
         return "success-no-key"
 
     if status in ("already-registered", "wrong-password", "locked"):
-        mark_account(email, status)
+        mark_account(actual_email, status)
         if tui:
             tui.update_worker(worker_id, "INFO", display_email, status, elapsed)
         return status
@@ -340,11 +348,13 @@ def main():
     ap.add_argument("--log", action="store_true", help="Show full subprocess logs (default: dashboard only)")
     ap.add_argument("--self", action="store_true", help="Run without proxy (use own IP)")
     ap.add_argument("--nyx", metavar="PROXY", default="", help="Use NyxProxy rotating proxy (format: user:pass@host:port or host:port:user:pass). IP rotates automatically per request.")
+    ap.add_argument("--tempmail", action="store_true", help="Use @hafizhmuzani.my.id tempmail for OTP (auto-generates random emails, replaces email_list.txt)")
     args = ap.parse_args()
     target = args.target
     self_mode = args.self
     nyx_proxy = args.nyx
     nyx_mode = bool(nyx_proxy)
+    tempmail_mode = args.tempmail
 
     if args.headless and not os.environ.get("QWENCLOUD_HIDDEN"):
         logger.info("headless requested → spawning Xvfb wrapper (run_hidden.sh)")
@@ -365,10 +375,10 @@ def main():
 
     headless = args.headless if not os.environ.get("QWENCLOUD_HIDDEN") else False
 
-    if not EMAIL_LIST_FILE.exists():
+    if not tempmail_mode and not EMAIL_LIST_FILE.exists():
         logger.error(f"{EMAIL_LIST_FILE} not found. Generate it first: python3 generate_email_list.py")
         sys.exit(1)
-    emails = [e.strip() for e in EMAIL_LIST_FILE.read_text().splitlines() if e.strip()]
+    emails = [] if tempmail_mode else [e.strip() for e in EMAIL_LIST_FILE.read_text().splitlines() if e.strip()]
     proxies = load_proxies() if not self_mode and not nyx_mode else []
     n_threads = args.threads
     censor = args.censor
@@ -416,9 +426,12 @@ def main():
             with count_lock:
                 if success[0] >= target:
                     return
-            email = claim_email()
-            if not email:
-                return
+            if tempmail_mode:
+                email = ""  # subprocess auto-generates
+            else:
+                email = claim_email()
+                if not email:
+                    return
             if self_mode:
                 proxy = ""
             elif nyx_mode:
@@ -431,7 +444,7 @@ def main():
             with count_lock:
                 attempted[0] += 1
                 idx = attempted[0]
-            result = run_one(email, proxy, idx, target, headless=headless, args_resume=True, worker_id=wid, censor=censor, verbose=verbose, tui=tui, self_mode=self_mode, nyx_mode=nyx_mode)
+            result = run_one(email, proxy, idx, target, headless=headless, args_resume=True, worker_id=wid, censor=censor, verbose=verbose, tui=tui, self_mode=self_mode, nyx_mode=nyx_mode, tempmail_mode=tempmail_mode)
             if tui:
                 tui.update_stats(success=success[0], failed=sum(1 for _ in []), attempted=attempted[0], remaining_proxies=len(proxies))
             else:
