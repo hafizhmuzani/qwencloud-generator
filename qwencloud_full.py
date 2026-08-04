@@ -110,63 +110,70 @@ def _wait_for_text(page, text: str, timeout: float = 30.0) -> bool:
 
 
 def _connect_to_9router(email: str, api_key: str, result: dict) -> None:
-    """Update 9Router SQLite database with new QwenCloud API key.
-    
-    Finds the Qwen3 connection (id: 982e817a...) in providerConnections
-    and replaces its API key with the freshly generated one.
+    """Create a NEW QwenCloud connection slot in 9Router for each fresh account.
+
+    Scans existing QwenCloud connections (Qwen1, Qwen2, ...), picks the next
+    free slot name (Qwen4, Qwen5, ...) and INSERTs a brand-new connection.
+    Existing slots are never touched.
     Also saves to api_keys.txt and accounts.json.
     """
     import sqlite3
-    
+    import uuid
+
     DB_PATH = Path.home() / "AppData/Roaming/9router/db/data.sqlite"
     if not DB_PATH.exists():
         warn(f"9Router DB not found at {DB_PATH}")
         return
-    
+
     info(f"[{email}] Connecting to 9Router...")
-    
+
     conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.cursor()
-    
-    # Find the QwenCloud "Qwen3" connection slot to replace
-    QWEN3_ID = "982e817a-b8cf-4a75-a0cf-b7f1cdae327b"
-    cursor.execute("SELECT id, data FROM providerConnections WHERE id=?", (QWEN3_ID,))
-    row = cursor.fetchone()
-    
-    if row:
-        # Update existing Qwen3 slot
-        data = json.loads(row[1])
-        data['apiKey'] = api_key
-        data['email'] = email
-        data['name'] = email
-        data['testStatus'] = 'pending'
-        data['lastError'] = None
-        data['errorCode'] = None
-        
-        cursor.execute(
-            "UPDATE providerConnections SET data=?, updatedAt=CURRENT_TIMESTAMP WHERE id=?",
-            (json.dumps(data), QWEN3_ID)
-        )
-        conn.commit()
-        info(f"[{email}] 9Router updated: Qwen3 slot → {email}")
-    else:
-        # Qwen3 slot not found, create a new connection
-        provider_id = "openai-compatible-chat-099c2f33-e34d-43e7-afcb-724d9c0c9d17"
-        new_id = str(__import__('uuid').uuid4())
-        data = {
-            "apiKey": api_key,
-            "email": email,
-            "defaultModel": None,
-            "testStatus": "pending",
-        }
-        cursor.execute(
-            "INSERT INTO providerConnections (id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-            (new_id, provider_id, "apikey", email, email, 3, 1, json.dumps(data))
-        )
-        conn.commit()
-        info(f"[{email}] 9Router: new connection created for {email}")
-    
+
+    PROVIDER_ID = "openai-compatible-chat-099c2f33-e34d-43e7-afcb-724d9c0c9d17"
+
+    # Find all existing QwenCloud connections and their slot numbers
+    cursor.execute(
+        "SELECT id, name FROM providerConnections WHERE provider=?",
+        (PROVIDER_ID,),
+    )
+    rows = cursor.fetchall()
+    max_slot = 0
+    for row in rows:
+        name = row[1] or ""
+        m = re.match(r"^Qwen(\d+)$", name)
+        if m:
+            max_slot = max(max_slot, int(m.group(1)))
+    next_slot = max_slot + 1
+    slot_name = f"Qwen{next_slot}"
+
+    new_id = str(uuid.uuid4())
+    data = {
+        "apiKey": api_key,
+        "email": email,
+        "name": email,
+        "defaultModel": "qwen-flash-character",
+        "testStatus": "pending",
+        "providerSpecificData": {
+            "prefix": "Qwen",
+            "apiType": "chat",
+            "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+            "nodeName": "QwenCloud",
+            "connectionProxyEnabled": False,
+            "connectionProxyUrl": "",
+            "connectionNoProxy": "",
+        },
+        "lastError": None,
+        "errorCode": None,
+        "lastErrorAt": None,
+    }
+    cursor.execute(
+        "INSERT INTO providerConnections (id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        (new_id, PROVIDER_ID, "apikey", slot_name, email, next_slot, 1, json.dumps(data)),
+    )
+    conn.commit()
     conn.close()
+    info(f"[{email}] 9Router: NEW connection created → {slot_name} (slot #{next_slot})")
     
     # Save to api_keys.txt
     keys_file = Path(__file__).parent / "api_keys.txt"
