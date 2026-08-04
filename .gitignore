@@ -1,32 +1,20 @@
-# Secrets - NEVER commit
+# 🚨 SENSITIVE - Never commit API keys or credentials!
+api_keys.txt
+api_keys_backup.txt
+accounts.json
 gmail_tokens.json
 client_secret.json
-accounts.json
-api_keys.txt
-api_keys.json
-email_list.txt
-used_proxy.txt
-*.lock
+*.key
+*.pem
+*.env
+.env*
 
-# Logs and temp files
-*.log
-*.tmp
-oauth_code.txt
-oauth_server.py
-
-# Browser profiles and runtime
+# Python
 __pycache__/
 *.pyc
 *.pyo
-.chrome-profile/
-.cdp-profile/
-screenshots/
-*.png
-*.jpg
+.pytest_cache/
 
-# IDE
-.vscode/
-.idea/
-
-# Kimchi internal
-.kimchi/
+# OS
+.DS_Store
+Thumbs.db
