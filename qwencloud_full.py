@@ -113,7 +113,7 @@ def _result(payload: dict):
     return payload
 
 
-def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms: int = 0) -> Optional[str]:
+def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms: int = 0, skip_time_filter: bool = False) -> Optional[str]:
     """Poll Gmail API for the latest Qwen Cloud verification code."""
     base = gmail_auth.normalize_gmail(email)
     info(f"[{email}] polling Gmail for verification code (base={base})")
@@ -151,7 +151,12 @@ def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms:
             warn(f"[{email}] Gmail list error: {e}")
             _sleep(2)
             continue
-        for m in data.get("messages", []):
+        
+        # Gmail API returns messages in reverse chronological order (newest first)
+        # Just take the FIRST message — it's the most recent one
+        messages = data.get("messages", [])[:1]
+        
+        for m in messages:
             r = urllib.request.Request(
                 f"https://www.googleapis.com/gmail/v1/users/me/messages/{m['id']}?format=full",
                 headers={"Authorization": f"Bearer {access_token}"},
@@ -160,19 +165,35 @@ def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms:
                 d = json.loads(urllib.request.urlopen(r, timeout=30).read().decode())
             except Exception:
                 continue
-            # Ignore emails received before the verification request was sent.
-            if min_internal_date_ms and int(d.get("internalDate", 0)) < min_internal_date_ms:
+            # Ignore old emails ONLY for signup mode (not login) - allows existing OTPs in inbox
+            internal_ms = int(d.get("internalDate", 0))
+            if not skip_time_filter and min_internal_date_ms and internal_ms < min_internal_date_ms:
                 continue
+            
             headers = {h["name"]: h["value"] for h in d.get("payload", {}).get("headers", [])}
-            if "Qwen Cloud" not in (headers.get("Subject", "") + headers.get("From", "")):
+            
+            # More lenient match - just look for "qwen" anywhere
+            subject = headers.get("Subject", "")
+            from_addr = headers.get("From", "")
+            combined_subj_from = (subject + from_addr).lower()
+            
+            # Skip emails that clearly are NOT QwenCloud
+            if not any(w in combined_subj_from for w in ['qwen', 'alibabacloud', 'notice.qwen']):
                 continue
+            
+            # Skip Welcome emails
+            if "welcome" in subject.lower():
+                info(f"[{email}] skipping Welcome email: {subject}")
+                continue
+            
             text = _extract_part(d.get("payload", {}), "text/plain")
             html = _extract_part(d.get("payload", {}), "text/html")
             combined = text + " " + html
             # The verification code is tied to the specific email variant used at signup.
             # To header may contain angle brackets: <email@gmail.com>
             to_header = headers.get("To", "").replace("<", "").replace(">", "")
-            if email not in (to_header + combined):
+            # For login mode (skip_time_filter), be more lenient with email matching
+            if not skip_time_filter and email not in (to_header + combined):
                 continue
             # Qwen Cloud email contains a large 36px <div> with the 6-digit code.
             # Some emails say "Your verification code...", others omit "Your".
@@ -193,6 +214,15 @@ def _read_verification_code(email: str, timeout: int = 60, min_internal_date_ms:
             if m2:
                 info(f"[{email}] verification code found (style fallback): {m2.group(1)}")
                 return m2.group(1)
+            # Smart fallback: look for "verification code" pattern in text (handles multi-code emails)
+            m3 = re.search(
+                r'verification code[^0-9]*(\d{6})',
+                text + " " + re.sub(r'<[^>]+>', ' ', html),  # strip HTML tags for cleaner match
+                re.IGNORECASE,
+            )
+            if m3:
+                info(f"[{email}] verification code found (text pattern): {m3.group(1)}")
+                return m3.group(1)
             # Last resort: any 6-digit in the message (may be a color code).
             codes = re.findall(r'\b\d{6}\b', combined)
             if codes:
@@ -354,8 +384,8 @@ def _do_login(page, email: str) -> dict:
     except Exception as e:
         return {"status": "error", "email": email, "reason": f"login-fill-failed: {e}"}
 
-    # Poll for verification code
-    code = _read_verification_code(email, timeout=90, min_internal_date_ms=request_code_at_ms)
+    # Poll for verification code (skip time filter for login to allow existing OTP)
+    code = _read_verification_code(email, timeout=90, min_internal_date_ms=request_code_at_ms, skip_time_filter=True)
     if not code:
         return {"status": "error", "email": email, "reason": "login-verification-code-not-found"}
 
@@ -384,22 +414,50 @@ def _do_login(page, email: str) -> dict:
     _wait_for_page_load(page, timeout=10)
     _sleep(0.5)
 
-    # Wait for dashboard via polling
+    # Wait for dashboard via polling AND wait for SSO cookie to be set
     dashboard_ok = False
     deadline = _now() + 30
     while _now() < deadline:
         _sleep(0.5)
         try:
-            if "home.qwencloud.com" in page.url:
+            url_lower = page.url.lower()
+            # Must be on home.qwencloud.com and NOT on SSO/login pages
+            if "home.qwencloud.com" in url_lower and "sso/login" not in url_lower:
                 page.wait_for_load_state("domcontentloaded", timeout=5000)
-                dashboard_ok = True
-                break
-        except Exception:
+                time.sleep(1)  # Extra wait for SPA hydration
+                
+                # Check if user is authenticated by looking for dashboard content
+                body_text = page.evaluate("() => document.body.innerText.toLowerCase()")
+                has_user_menu = page.evaluate("""() => {
+                    // Look for user avatar/icon or logout button (indicates logged in)
+                    const selectors = ['[class*="avatar"]', '[class*="user"]', '[data-testid*="user"]', '[class*="profile"]'];
+                    for (const sel of selectors) {
+                        if (document.querySelector(sel)) return true;
+                    }
+                    // Check for sidebar nav items that appear when logged in
+                    const navItems = document.querySelectorAll('[class*="sidebar"] a, nav a');
+                    for (const item of navItems) {
+                        if (item.textContent.includes('Settings') || item.textContent.includes('API Keys')) return true;
+                    }
+                    return false;
+                }""")
+                
+                info(f"[{email}] dashboard check: has_user_menu={has_user_menu}, body_has_login={'log in' in body_text}")
+                
+                # If we can find user menu elements OR the body doesn't have "Log in to QwenCloud" prompt
+                if has_user_menu or ("log in" not in body_text[:500] and "access all services" not in body_text):
+                    dashboard_ok = True
+                    info(f"[{email}] authenticated session established")
+                    break
+        except Exception as e:
+            info(f"[{email}] dashboard check exception: {e}")
             continue
+    
     if not dashboard_ok:
-        return {"status": "error", "email": email, "reason": "login-dashboard-timeout"}
-    info(f"[{email}] login dashboard reached")
-    return {"status": "login-ok", "email": email}
+        info(f"[{email}] dashboard check failed - will retry on /api-keys access")
+    
+    info(f"[{email}] login dashboard reached, returning status={dashboard_ok}")
+    return {"status": "login-ok" if dashboard_ok else "logged-in-session-started", "email": email, "needs_auth_check": not dashboard_ok}
 
 
 def _do_signup(page, email: str, country: str) -> dict:
@@ -432,9 +490,46 @@ def _do_signup(page, email: str, country: str) -> dict:
     else:
         return {"status": "error", "email": email, "reason": "verification-code-page-not-found"}
 
-    code = _read_verification_code(email, timeout=90, min_internal_date_ms=request_code_at_ms)
+    # --- OTP page detected! Now click Resend to get a FRESH code ---
+    info(f"[{email}] OTP page detected")
+    
+    # First, wait for any auto-sent OTP to arrive (~5-15 seconds)
+    initial_wait = 20
+    info(f"[{email}] waiting {initial_wait}s for first OTP to arrive...")
+    _sleep(initial_wait)
+    
+    # Record timestamp after this wait
+    fresh_otp_timestamp = int(time.time() * 1000) - 120000  # 2 min buffer BEFORE now
+    
+    # Poll for FIRST OTP that should have arrived
+    code = _read_verification_code(email, timeout=30, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
+    
     if not code:
-        return {"status": "error", "email": email, "reason": "verification-code-not-found"}
+        # If no OTP yet, try clicking Resend (if enabled)
+        info(f"[{email}] No OTP found yet, trying Resend...")
+        try:
+            # Find Resend button - handle different text variations
+            resend_btn = page.get_by_role("button", name=re.compile(r"(resend|send.*code)", re.I))
+            for btn in resend_btn.all():
+                try:
+                    is_enabled = btn.is_enabled()
+                    if is_enabled:
+                        info(f"[{email}] Resend button enabled, clicking...")
+                        btn.click()
+                        time.sleep(5)
+                        fresh_otp_timestamp = int(time.time() * 1000) - 120000  # Same buffer
+                        break
+                except:
+                    continue
+            
+            # Poll for RESNED OTP
+            code = _read_verification_code(email, timeout=40, min_internal_date_ms=fresh_otp_timestamp, skip_time_filter=False)
+            
+        except Exception as e:
+            info(f"[{email}] Resend failed: {e}")
+        
+        if not code:
+            return {"status": "error", "email": email, "reason": "verification-code-not-found"}
 
     # Type the whole code into the first OTP input with real key events.
     # The UI auto-advances between the 6 boxes and submits once complete.
@@ -563,96 +658,136 @@ def _dismiss_overlays(page):
 def _create_api_key(page, description: str = "default") -> Optional[str]:
     info("navigating to API keys page")
     _dismiss_overlays(page)
-    # Navigate to /api-keys via page.goto with commit (don't wait for full load)
+    
+    # Navigate to /api-keys via direct URL (might trigger SSO redirect)
     try:
-        page.goto("https://home.qwencloud.com/api-keys", wait_until="commit", timeout=15000)
-    except Exception:
+        page.goto("https://home.qwencloud.com/api-keys", wait_until="domcontentloaded", timeout=15000)
+        time.sleep(2)
+    except Exception as e:
+        warn(f"Initial navigation to /api-keys failed: {e}")
         pass
-    # Wait for Create API key button, poll 1s, timeout 30s
-    if not _wait_for(page, 'button:has-text("Create API key")', timeout=30):
-        # Fallback: click sidebar link
-        try:
-            _dismiss_overlays(page)
-            page.get_by_role("link", name="API Keys").first.click()
-        except Exception:
-            pass
-        if not _wait_for(page, 'button:has-text("Create API key")', timeout=15):
-            warn("Create API key button not found")
+    
+    # Check if we were redirected to login or landing page
+    url_lower = page.url.lower()
+    if "sso/login" in url_lower or ("home.qwencloud.com" in url_lower and "/api-keys" not in url_lower):
+        info(f"API Keys page triggered SSO redirect. Current URL: {page.url}")
+        
+        # Try clicking "Get Started" if on landing page
+        if "sso/login" not in url_lower:
+            try:
+                get_started = page.get_by_role("link", name="Get Started")
+                if get_started.count() > 0:
+                    info("Clicking Get Started to navigate to login...")
+                    get_started.click()
+                    page.wait_for_load_state("domcontentloaded", timeout=15000)
+                    time.sleep(2)
+            except Exception as e:
+                info(f"Failed to click Get Started: {e}")
+        
+        # After waiting, check if we're now on API keys page with fresh session
+        url_lower = page.url.lower()
+        if "/api-keys" not in url_lower:
+            warn(f"Still not on API keys page: {page.url}")
             return None
-
-    # Wait for page to be fully loaded before clicking
-    _wait_for_page_load(page, timeout=10)
-    _dismiss_overlays(page)
-
+    
+    # Wait for Create API key button or sidebar link
+    if not _wait_for(page, 'button:has-text("Create API key")', timeout=30):
+        info("Create API key button not found, trying sidebar navigation...")
+        _dismiss_overlays(page)
+        try:
+            api_keys_link = page.get_by_role("link", name="API Keys")
+            if api_keys_link.count() > 0:
+                api_keys_link.click()
+                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                time.sleep(2)
+        except Exception as e:
+            warn(f"Sidebar API Keys link click failed: {e}")
+        
+        if not _wait_for(page, 'button:has-text("Create API key")', timeout=15):
+            warn("Create API key button still not found")
+            return None
+    
     # Click Create API key
     try:
-        page.locator('button:has-text("Create API key")').first.click()
+        create_btn = page.locator('button:has-text("Create API key")').first
+        create_btn.wait_for(state="visible", timeout=5000)
+        create_btn.click()
+        _sleep(1)
     except Exception as e:
         warn(f"Create API key button click failed: {e}")
         return None
-
-    # Wait for Create API Key dialog (heading text)
+    
+    # Wait for dialog
     if not _wait_for_text(page, "Create API Key", timeout=15):
-        warn("Create API Key dialog not found")
+        info("Looking for alternative dialogs...")
+        # Maybe it's already generated? Or different text?
+        page_body = page.evaluate("() => document.body.innerText.substring(0, 1000)")
+        warn(f"Body preview: {page_body[:500]}")
         return None
-
-    # Wait for dialog to fully render
-    _wait_for_page_load(page, timeout=5)
-
+    
     # Fill description
     try:
-        desc = page.locator('input[placeholder*="Production API key"]')
-        desc.wait_for(state="visible", timeout=10000)
-        desc.fill(description)
+        desc_input = page.locator('input[placeholder*="Production API key"]').first
+        if desc_input.is_enabled():
+            desc_input.fill(description)
+            _sleep(1)
     except Exception as e:
-        warn(f"description fill failed: {e}")
-        return None
-
-    # Wait for Generate Key to become enabled (description triggers enable)
+        warn(f"Description fill failed: {e}")
+        # Continue without description
+    
+    # Wait for Generate button to become enabled
     deadline = _now() + 10
     while _now() < deadline:
         try:
-            disabled = page.locator('button:has-text("Generate Key")').is_disabled()
-            if not disabled:
+            gen_btn = page.locator('button:has-text("Generate Key")')
+            if gen_btn.is_enabled():
                 break
-        except Exception:
-            break
+        except:
+            pass
         _sleep(0.5)
-
+    
     # Click Generate Key
     try:
         gen_btn = page.locator('button:has-text("Generate Key")')
         gen_btn.wait_for(state="visible", timeout=10000)
         gen_btn.click()
+        _sleep(2)
     except Exception as e:
         warn(f"Generate Key click failed: {e}")
         return None
-
-    # Wait for Copy your API Key dialog (heading text)
-    if not _wait_for_text(page, "Copy your API Key", timeout=20):
-        warn("Copy your API Key dialog not found")
-        return None
-
-    # Extract API key — find the visible input whose value starts with sk-
+    
+    # Extract API key from the response dialog/page
     key = None
-    deadline = _now() + 10
+    deadline = _now() + 15
     while _now() < deadline:
         try:
-            key = page.evaluate(
-                "() => {"
-                "  const inputs = Array.from(document.querySelectorAll('input'));"
-                "  const visible = inputs.filter(i => { const r = i.getBoundingClientRect(); return r.width > 0 && r.height > 0; });"
-                "  const keyInput = visible.find(i => i.value && i.value.startsWith('sk-'));"
-                "  return keyInput ? keyInput.value : null;"
-                "}"
-            )
+            # Try multiple selectors
+            key_elem = page.query_selector('input[value^="sk-"]')
+            if key_elem:
+                key = key_elem.input_value()
+                if key and key.startswith("sk-"):
+                    info(f"API key extracted: {key[:20]}...")
+                    return key
+            
+            # Also try evaluating via JS
+            key = page.evaluate("""() => {
+                const inputs = Array.from(document.querySelectorAll('input'));
+                const visible = inputs.filter(i => { 
+                    const r = i.getBoundingClientRect(); 
+                    return r.width > 0 && r.height > 0; 
+                });
+                const keyInput = visible.find(i => i.value && i.value.startsWith('sk-'));
+                return keyInput ? keyInput.value : null;
+            }""")
             if key:
-                info(f"API key extracted: {key[:20]}...")
+                info(f"API key extracted via JS: {key[:20]}...")
                 return key
-        except Exception:
-            pass
+                
+        except Exception as e:
+            warn(f"Key extraction attempt failed: {e}")
         _sleep(1)
-    warn("API key extraction failed")
+    
+    warn("Failed to extract API key - might be a UI change")
     return None
 
 
@@ -698,40 +833,166 @@ def main():
 
         try:
             page.goto("https://home.qwencloud.com/", wait_until="commit", timeout=30000)
-            _wait_for_text(page, "Log In", timeout=20)
-
+            
             if _is_access_denied(page):
                 browser.close()
                 return _result({"status": "access-denied", "email": args.email})
-
+            
             url = page.url
-            title = page.title()
+            title = page.title().lower()
             info(f"landing: {url} | {title}")
-
-            # If we are on login page, go to signup.
-            if "sso/login" in url or "Log In" in title:
+            
+            # NEW UI: Landing page has "Get Started" link in the banner
+            # Go directly to signup via Get Started or Sign Up link
+            signup_attempts = 0
+            while signup_attempts < 3:
+                signup_attempts += 1
+                
+                # Wait for page to fully load
                 try:
-                    page.get_by_role("link", name="Sign Up").click()
-                    page.wait_for_url(re.compile(r"/sso/register"), timeout=15000)
+                    page.wait_for_load_state("domcontentloaded", timeout=10000)
+                except:
+                    pass
+                time.sleep(1)
+                
+                url = page.url.lower()
+                title = page.title().lower()
+                info(f"attempt {signup_attempts}: url={url} | title={title}")
+                
+                # Check if we're already on register page
+                if "sso/register" in url:
+                    info("Already on register page!")
+                    break
+                
+                # Try Get Started link first (new UI landing page)
+                try:
+                    get_started = page.get_by_role("link", name="Get Started")
+                    if get_started.count() > 0:
+                        info(f"Found 'Get Started' link, clicking...")
+                        get_started.click()
+                        try:
+                            page.wait_for_load_state("domcontentloaded", timeout=15000)
+                        except:
+                            pass
+                        time.sleep(2)
+                        info(f"After Get Started: url={page.url}")
+                        continue
                 except Exception as e:
-                    browser.close()
-                    return _result({"status": "error", "email": args.email, "reason": f"goto-signup-failed: {e}"})
-
-            # Signup flow
+                    info(f"Get Started click failed: {e}")
+                
+                # Try Sign Up link (on SSO login page)
+                if "sso/login" in url or "login" in url:
+                    try:
+                        signup_link = page.get_by_role("link", name="Sign Up")
+                        if signup_link.count() > 0:
+                            info(f"Found 'Sign Up' link on login page, clicking...")
+                            signup_link.click()
+                            try:
+                                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            except:
+                                pass
+                            time.sleep(2)
+                            info(f"After Sign Up: url={page.url}")
+                            continue
+                    except Exception as e:
+                        info(f"Sign Up link click failed: {e}")
+                
+                # Try "Create account" or other signup buttons
+                if "login" in url:
+                    try:
+                        create_btn = page.get_by_role("button", name=re.compile(r"(Create|Sign\s*up)", re.I))
+                        if create_btn.count() > 0:
+                            info(f"Found create/signup button, clicking...")
+                            create_btn.first.click()
+                            try:
+                                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                            except:
+                                pass
+                            time.sleep(2)
+                            continue
+                    except Exception as e:
+                        pass
+                
+                # If not on any known page, check what we see
+                if signup_attempts >= 3:
+                    try:
+                        body_text = page.evaluate("() => document.body.innerText.substring(0, 500)")
+                        info(f"Page body text: {body_text[:200]}")
+                    except:
+                        pass
+                    return _result({"status": "error", "email": args.email, "reason": f"signup-page-not-found:url={url}:title={title}"})
+            
+            # Continue with signup flow from here
             res = _do_signup(page, args.email, country)
             if res["status"] == "already-registered":
                 info(f"[{args.email}] already-registered, trying login to harvest API key")
-                # Navigate to home.qwencloud.com to get fresh SSO params (avoids "invalid callback params")
+                # On the SAME register page, look for "Log In" link instead of navigating to home
                 try:
-                    page.goto("https://home.qwencloud.com/", wait_until="commit", timeout=15000)
-                    _wait_for_text(page, "Log In", timeout=10)
-                    _dismiss_overlays(page)
-                except Exception:
-                    pass
-                login_res = _do_login(page, args.email)
-                if login_res["status"] != "login-ok":
+                    info("Looking for 'Log In' link on the current page...")
+                    
+                    # Check if we're still on register page
+                    url_lower = page.url.lower()
+                    if "/register" not in url_lower:
+                        warn(f"Not on register page anymore: {page.url}")
+                    
+                    # Try multiple strategies to get to login page
+                    success = False
+                    
+                    # Strategy 1: Direct URL change (simplest)
+                    info("Strategy 1: Direct navigation to sso/login...")
+                    try:
+                        page.goto("https://account.alibabacloud.com/sso/login.htm?response_type=code&client_id=qwencloud", wait_until="domcontentloaded", timeout=15000)
+                        time.sleep(2)
+                        if "sso/login" in page.url.lower():
+                            info("✅ Direct login nav successful!")
+                            success = True
+                    except Exception as e:
+                        info(f"Direct nav failed: {e}")
+                    
+                    # Strategy 2: Find "Log In" or "Sign In" link on current page
+                    if not success:
+                        info("Strategy 2: Looking for 'Log In' link...")
+                        try:
+                            log_in_links = page.get_by_role("link", name=re.compile(r"(log|signin)", re.I))
+                            if log_in_links.count() > 0:
+                                log_in_links.first.click()
+                                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                                time.sleep(2)
+                                if "sso/login" in page.url.lower():
+                                    info("✅ Found 'Log In' link!")
+                                    success = True
+                        except Exception as e:
+                            info(f"Login link click failed: {e}")
+                    
+                    # Strategy 3: Click "Get Started" which redirects to login
+                    if not success:
+                        info("Strategy 3: Using Get Started → Login fallback...")
+                        try:
+                            get_started = page.get_by_role("link", name="Get Started")
+                            if get_started.count() > 0:
+                                get_started.click()
+                                page.wait_for_load_state("domcontentloaded", timeout=15000)
+                                time.sleep(2)
+                                if "sso/login" in page.url.lower():
+                                    info("✅ Get Started → Login successful!")
+                                    success = True
+                        except Exception as e:
+                            info(f"Get Started fallback failed: {e}")
+                    
+                    if not success:
+                        warn("All strategies failed! Current page:")
+                        body_preview = page.evaluate("() => document.body.innerText.substring(0, 500)")
+                        info(body_preview[:300])
+                
+                    login_res = _do_login(page, args.email)
+                    if login_res["status"] != "login-ok":
+                        browser.close()
+                        return _result({**login_res, "email": args.email})
+                        
+                except Exception as e:
+                    warn(f"Failed to transition to login: {e}")
                     browser.close()
-                    return _result({**login_res, "email": args.email})
+                    return _result({"status": "error", "email": args.email, "reason": str(e)})
             elif res["status"] != "signup-ok":
                 browser.close()
                 return _result({**res, "email": args.email})
@@ -744,7 +1005,15 @@ def main():
                     info(f"[{args.email}] SSO session lost (page={pg}), re-logging in")
                     try:
                         page.goto("https://home.qwencloud.com/", wait_until="commit", timeout=15000)
-                        _wait_for_text(page, "Log In", timeout=10)
+                        # Navigate to login page (new UI: Get Started → Login)
+                        if "sso/login" not in page.url.lower():
+                            try:
+                                gs = page.get_by_role("link", name="Get Started")
+                                if gs.count() > 0:
+                                    gs.click()
+                                    time.sleep(2)
+                            except:
+                                pass
                         login_res = _do_login(page, args.email)
                         if login_res["status"] == "login-ok":
                             api_key = _create_api_key(page, args.api_key_desc)

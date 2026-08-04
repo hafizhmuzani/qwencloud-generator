@@ -193,7 +193,8 @@ def run_one(email: str, proxy: str, idx: int, total: int, headless: bool = False
     display_email = mask_email(email) if censor else email
     if tui:
         tui.update_worker(worker_id, "RUNNING", display_email, "signup...")
-    cmd = ["python3", SCRIPT, "--email", email]
+    python_exe = sys.executable or "python"
+    cmd = [python_exe, SCRIPT, "--email", email]
     if not self_mode and not nyx_mode:
         proxy_url = to_proxy_url(proxy)
         probe = probe_proxy(proxy_url)
