@@ -14,11 +14,12 @@ DASHBOARD_HTML = SCRIPT_DIR / "qwencloud-monitor.html"
 
 
 def get_slot_map():
-    """Read 9Router DB to get email → slot (QwenN) mapping."""
-    slot_map = {}  # email -> slot_name
+    """Read 9Router DB to get email → slot (QwenN) and key → slot mappings."""
+    slot_map = {}   # email -> slot_name
+    key_slot_map = {}  # apiKey -> slot_name (fallback for slots with no email)
     if not DB_PATH.exists():
         print(f"  Warning: 9Router DB not found at {DB_PATH}")
-        return slot_map
+        return slot_map, key_slot_map
 
     conn = sqlite3.connect(str(DB_PATH))
     try:
@@ -32,12 +33,15 @@ def get_slot_map():
                 email = data.get("email", "")
                 if email:
                     slot_map[email] = name
+                api_key = data.get("apiKey", "")
+                if api_key:
+                    key_slot_map[api_key] = name
             except (json.JSONDecodeError, TypeError):
                 continue
     finally:
         conn.close()
 
-    return slot_map
+    return slot_map, key_slot_map
 
 
 def get_slot_number(slot_name):
@@ -58,13 +62,17 @@ def main():
     # Filter out metadata keys
     accounts = {k: v for k, v in raw.items() if not k.startswith("_")}
 
-    # Get slot mapping from 9Router
-    slot_map = get_slot_map()
+    # Get slot mapping from 9Router (email -> slot, apiKey -> slot fallback)
+    slot_map, key_slot_map = get_slot_map()
 
     # Build dashboard entries
     entries = []
     for email, info in accounts.items():
+        key = info.get("api_key", info.get("key", ""))
         slot = slot_map.get(email, "")
+        # Fallback: match by API key for slots where email is missing in 9Router
+        if not slot and key:
+            slot = key_slot_map.get(key, "")
         entries.append({
             "slot": slot,
             "email": email,

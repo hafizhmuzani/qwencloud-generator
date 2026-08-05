@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QwenCloud Monitor — 122 Accounts</title>
+<title>QwenCloud Monitor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -136,7 +136,7 @@ tr:hover td{background:rgba(56,189,248,.04)}
 <body>
 
 <div class="header">
-  <h1>QwenCloud Monitor — <span>57 Accounts</span></h1>
+  <h1>QwenCloud Monitor — <span id="hdrCount"></span></h1>
   <div class="header-right">
     <span style="color:var(--text3);font-family:monospace;font-size:11px">Generated: 2026-08-05 13:57:06</span>
     <button class="btn" onclick="showCurlSnippet()" title="Show PowerShell command to regenerate this dashboard">↻ Regenerate Snippet</button>
@@ -146,12 +146,12 @@ tr:hover td{background:rgba(56,189,248,.04)}
 <div class="stats" id="stats">
   <div class="stat-card">
     <div class="label">Total Accounts</div>
-    <div class="value accent">57</div>
+    <div class="value accent" id="statTotal"></div>
     <div class="sub">hafizhmuzani.my.id fleet</div>
   </div>
   <div class="stat-card">
     <div class="label">Active Keys</div>
-    <div class="value" id="stat-active">57</div>
+    <div class="value" id="stat-active"></div>
     <div class="sub">last verified on registration</div>
   </div>
   <div class="stat-card">
@@ -166,8 +166,8 @@ tr:hover td{background:rgba(56,189,248,.04)}
   </div>
   <div class="stat-card">
     <div class="label">Total Quota</div>
-    <div class="value" style="font-size:18px">57M tokens</div>
-    <div class="sub">1M free/model × 57 accounts</div>
+    <div class="value" style="font-size:18px" id="stat-quota"></div>
+    <div class="sub" id="stat-quota-sub"></div>
   </div>
   <div class="stat-card">
     <div class="label">Last Batch</div>
@@ -237,6 +237,22 @@ tr:hover td{background:rgba(56,189,248,.04)}
 <script>
 // ========== DATA ==========
 const ACCOUNTS = [
+  {
+    "slot": "Qwen3",
+    "email": "sebastian.flo410@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDDRRR.zvyp.MEUCICnBzY4DnksGhAIZqoT-IP-ZxEwK7qMVZG7xYSLXs90DAiEAvruYqVeXE5acqweYAngApHyzxlqIK_3ZUa524mLNNoM",
+    "country": "Morocco",
+    "registered": "2026-08-04T18:51:48Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen4",
+    "email": "george.young728@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDDRYY.xtoZ.MEUCIQDAhZOWzDb9_DKt9kvjceige2en1lyYQccunpwcz-dulgIgUcVX4QZkd4IBqXmJNEHewANClaIOGjL7CEGNFu4plWo",
+    "country": "France",
+    "registered": "2026-08-04T18:56:37Z",
+    "status": "ok"
+  },
   {
     "slot": "Qwen5",
     "email": "charlotte.walker674@hafizhmuzani.my.id",
@@ -1174,43 +1190,283 @@ const ACCOUNTS = [
     "status": "ok"
   },
   {
-    "slot": "",
-    "email": "ea.rlyright.22@gmail.com",
-    "key": "sk-ws-H.DMDMIDL.TbFl.MEUCIQClbFLx3-osjAcjq2ps30Gua6LJReVXVR9zfV0iBiL80QIgSOIfWsZuh2gimhLG-uqaPadZ-yed5IqxZGijLGkvUWQ",
-    "country": "Vietnam",
-    "registered": "2026-08-05T00:01:08.749156",
+    "slot": "Qwen122",
+    "email": "jacob.moore140@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMRD.LMkc.MEYCIQDKhIPaYnxIghNLdPTGkXxCjN4o4JlU4OSkppQ-CoBTPgIhAOxSlR4pnAfKelw5VPm_ZakvYU5LL1BgGAp9QCJdi80k",
+    "country": "Peru",
+    "registered": "2026-08-05T10:23:32Z",
     "status": "ok"
   },
   {
-    "slot": "",
-    "email": "reni.wulan541@hafizhmuzani.my.id",
-    "key": "sk-ws-H.DMDDHHR.V5Sy.MEUCIQCoZpii6DXBI8lbxQxxR8zu9vd49LM5VkPW6FHbw12u8AIgR7rtFAhtuXiBTUb8lhMBpSZHKXDpGPgn6OuQKl-P9LI",
+    "slot": "Qwen123",
+    "email": "george.young161@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMRI.jV5q.MEYCIQDzM3wuY2EPQhofxcpn3qsFbgHznlVADA7ujdAZEsYxKwIhAOSgagYqHDZJ2PjlcQG2wK9bJEK8rIjglqrXFxQuSnJd",
+    "country": "Spain",
+    "registered": "2026-08-05T10:24:32Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen124",
+    "email": "gina.satria665@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMRP.kemz.MEYCIQCozVIE1kRfoj7wi92AAg2yghfS7s7xZBbVuE6oQZXolQIhAK9GFKhPwhhTcdNfECS3Bo9kZhcwolxN7AJiR7geE93L",
+    "country": "New Zealand",
+    "registered": "2026-08-05T10:25:33Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen125",
+    "email": "daniel.graham614@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMEI.d2va.MEYCIQDJyoXSL4cybe51JW6_YHs0AwHZpFlL8sEn0gY1lW56UwIhAIxh7wQuF67mo54kiLW1FNMv46VAineYN2lskXWHn3o8",
     "country": "Morocco",
-    "registered": "2026-08-05T00:49:47.857766",
+    "registered": "2026-08-05T10:27:19Z",
     "status": "ok"
   },
   {
-    "slot": "",
-    "email": "david.sullivan300@hafizhmuzani.my.id",
-    "key": "sk-ws-H.DMDDHIM.ItFE.MEUCIE-FxasZZEKwH6uPSZQbt4cEDmGVx7J69sng6uuBQkokAiEAzEWGpjHPp5OGbr12cWIceWjJ8lCwm_19mcZhCAXQQtA",
+    "slot": "Qwen126",
+    "email": "liam.hall756@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMEE.hRTO.MEUCIG0jiUaPrKp9UwP2hcFz_VCyRdMP8CnNRyE93koeDQFGAiEA-s1-cU6kY9JYzg0kD3KoqHU9Rjl866yZwzNCCUvYPZg",
+    "country": "Malaysia",
+    "registered": "2026-08-05T10:28:18Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen127",
+    "email": "gina.satria111@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMEX.iHIz.MEYCIQCI6Y94uF_fH72Ycm1OttinA62asDd26fyYlaRpcQfg8gIhAOyyMpw03OdBFsj9qjbYQRRUhXPQMkgblLzEkcgmpI68",
+    "country": "Spain",
+    "registered": "2026-08-05T10:29:19Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen128",
+    "email": "bunga.citra461@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMPL.7Lsc.MEYCIQDitB4hDwUGqXjhuFQcsDWoPb-oOSSDk6mVNk95Z54B9QIhAOM_X71bjROmR0J8r1yj6-WQTPiA40bvEdCIncYp1OGd",
+    "country": "Denmark",
+    "registered": "2026-08-05T10:30:22Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen129",
+    "email": "maria.taufik415@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMPR.F1yd.MEQCIC1skkMrTsGAPM7M68kfZdVnF7ukPuuW2KnynjXcSBvUAiBWGTmDlOAwKVPkeIhOdBSwTlwtpNuEZYIP24FfBKqxKg",
+    "country": "Indonesia",
+    "registered": "2026-08-05T10:31:23Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen130",
+    "email": "fatimah.azzahra125@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMYM.XGE1.MEUCICCRwv7YciicCzubFsfFN4QSRKYFR1kFgc2fiaw7I_AYAiEA1ecbEraPmLScsTb7EXmu66SJH8BJXLl6dugv9t-f370",
+    "country": "Ireland",
+    "registered": "2026-08-05T10:32:21Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen131",
+    "email": "ella.wallace739@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMYR.Dqnz.MEQCIGHlFv919UAbybP1EE-DEHkZ0RmL9F3ah9VsP4YcWctJAiAa1ERLt3SLA6YLDOI1eMCgoREroYrs4eyTwczh7-LrEA",
+    "country": "Belgium",
+    "registered": "2026-08-05T10:33:24Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen132",
+    "email": "zaskia.adya346@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMXM.1oe0.MEYCIQDc-z44nHrE3HPm5vZqcUij12qsUPV_ocZhSsNF3h-aWQIhAJDgl8VGVLNPXcjdiKNGFzg6g-43kQsXHowNIxoSllfA",
+    "country": "Australia",
+    "registered": "2026-08-05T10:34:25Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen133",
+    "email": "arya.saloka844@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRMXR.FPer.MEYCIQCDrgXIq8OEM07DNX4hA98OUw9ISKizR7dJcUBU7URPhwIhAPfDyrMxJCrOG2LFPWxsA5NrhoSFj3QxkrHUl30sqgHG",
+    "country": "Turkey",
+    "registered": "2026-08-05T10:35:25Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen134",
+    "email": "zaskia.adya440@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDMD.kQaJ.MEUCIQDhMxFiPSglobjBSdG1ztW0pOptwRK-N9nRg-YNGAw1YAIgePODHBHZIeaLXGElY6fJ6buE8-c3rvthqIWGNfrAhvk",
+    "country": "Ireland",
+    "registered": "2026-08-05T10:36:26Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen135",
+    "email": "yusri.amanda382@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDMI.cBQc.MEQCICmuFaOWaCA3diY87FEjiZraaLunB4KVR8O2XWMaG6G0AiAeFjkiwmJzXKJTqy1Yb0kF4_wURMmmMHcVeopjiXGOSQ",
+    "country": "Australia",
+    "registered": "2026-08-05T10:37:26Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen136",
+    "email": "kiki.amalia839@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDME.WOJr.MEUCIQCehlm_nvi2VA7mYqZ21S-otlEGzfYTaZMAZpf3S1cxawIgO-ni04acNa298ysNP3crQrFjXw3APRs-PD05_GT3USc",
+    "country": "Thailand",
+    "registered": "2026-08-05T10:38:29Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen137",
+    "email": "nina.zulkarnaen630@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDDI.Jazc.MEQCIAQC0XFaZTyNYo7v5MIyY45ThiAyO67Jdqz6Cu5RWnPqAiBmtg0TsV9-UeU1NFFyg39zceUJS-TNv55V0DhjxKEXdQ",
+    "country": "Australia",
+    "registered": "2026-08-05T10:39:28Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen138",
+    "email": "sri.suparwati629@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDDP.9YXJ.MEQCIF71wSPgV2FrqVWnUU5IuFkyg3Jr9GM2kKOL_1fOusNfAiAawmtc-kn_ZAsadQGT__kqWxJtysr2Z7Mej8n0BhlpqA",
+    "country": "Australia",
+    "registered": "2026-08-05T10:40:31Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen139",
+    "email": "udin.saputra814@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDHD.4YuX.MEUCIQCjHbcEL-IfTFKHYYMMflfMQ-r9ZtCDuaADEl1Rl8hWVAIgMepW2eoPxH8C37G1ydwTqoGmCtgcKVHSqcuMCjBLXDw",
+    "country": "Germany",
+    "registered": "2026-08-05T10:41:37Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen140",
+    "email": "titi.kamal926@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDHR.uwMD.MEYCIQDN4cCqsGygmr30EdbicDSFSM-UAv3CF9ULsFo5cCs6EAIhAL-YjdDfT7zNUbf161oHO9z0Mx9Xw0E5dJRi9TPhQ8KE",
+    "country": "Morocco",
+    "registered": "2026-08-05T10:42:40Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen141",
+    "email": "grace.crawford612@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDIM.a9wd.MEQCID5OYnnG0dsGRRYG87MKv3gVADtcMv0-RWuUpd5kQXG0AiBCggdva0AmcKgjTy_3-WF_sqe9MiVWOVVMlwJJ7SV-IQ",
+    "country": "Turkey",
+    "registered": "2026-08-05T10:43:43Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen142",
+    "email": "mila.agnes628@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDIR.OJJh.MEYCIQCb_qCFNlhpIN-3MTBl5EB0826WSOglIqa5HN0jGOjzPQIhAJJCybs5TGHtW5LyIGThCib_5MerRo5XasGRyitS94cX",
+    "country": "Philippines",
+    "registered": "2026-08-05T10:44:49Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen143",
+    "email": "nagita.slavina178@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDIP.pWDe.MEQCIDQsZwGcJ9vMwbcIVCbYby0eP6PGntGslPWxqc6A5zpMAiBJiVqoeTFdu0iFUi7vhSzWjtTxFFKi1F0xqEBZdDPlpw",
+    "country": "Singapore",
+    "registered": "2026-08-05T10:45:53Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen144",
+    "email": "sebastian.flo347@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDLI.bqww.MEYCIQC-rzAEQ8DJYT6OSyFBFIvIuU4S4T_E-H_14cOnqpyLQgIhALDFZQLFQwYJnjILLC8jVvPkzZoJKAAfzNYaWdjOI2dD",
+    "country": "South Africa",
+    "registered": "2026-08-05T10:46:57Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen145",
+    "email": "oliver.woods528@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDLX.h4Uz.MEUCIQDjQzTY1975M15GLk1hO0enx__XsIT9CiMiAGxhZfaoYAIgNkGpxppTcxyKxEBkOh7EkMUC1Y6z8_aPYiFH6V8s7Oo",
+    "country": "Netherlands",
+    "registered": "2026-08-05T10:48:02Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen146",
+    "email": "ahmad.fadilah741@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDRE.tzFZ.MEUCIA3wz8bEo7-KV_o3EFccrEvuzjIZjk7kqESzzwnIW9DIAiEA6xQTpyBX3YYYBsCDMxRL_ag-F0qSQa7v0B4rbs2DF4U",
+    "country": "Ireland",
+    "registered": "2026-08-05T10:49:09Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen147",
+    "email": "sandra.dewi222@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDEH.KSK2.MEUCIQCG4TUbBhQMZQrYb0BU-CKnGyM5r2Yav96wf_47og5szwIgc36XSxmX7b9pHT1OsiBhzQgobJ8auaX4OUcBq2brzQ8",
+    "country": "Philippines",
+    "registered": "2026-08-05T10:51:02Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen148",
+    "email": "maya.kusuma981@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDEP.Tsa6.MEYCIQCnb7RUd9GUaMK60nAm4K7PtbVNwtc2D5sew8yInT74HwIhALR8g6Dn0tnsTkcPec7f2vyVOYQ4pIOPh_fOaToBpivg",
+    "country": "Belgium",
+    "registered": "2026-08-05T10:52:05Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen149",
+    "email": "matthew.stewart207@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDPD.qqt4.MEYCIQDuTu2H6k7_qsUPh_PqNrAhaKnI6MaqeZV_HDB-JqRaHAIhANo5UVKLai3rKVTM842CsK0zL4LeBmsLY45mM5WMhSrq",
+    "country": "Belgium",
+    "registered": "2026-08-05T10:53:10Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen150",
+    "email": "vani.firmansyah119@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDPR.Atcb.MEQCIBcBaS-6VKmQN9lahPrXZiLdwkEpBz3Swkb5ua_YbDbyAiACwg_-zUkodn5eJsVCul3TXiSj80zxqzKTzZQ9IeJYFA",
+    "country": "Norway",
+    "registered": "2026-08-05T10:54:14Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen151",
+    "email": "sandra.dewi306@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDPX.Jjnl.MEUCICmS9jK2-tXfxeY1oxsDI3Yti35U6gIttSM3hk23vkpXAiEArelRoM8tKJezeF41CPyYiNiUz_H0IYAzz032q5IPZvU",
+    "country": "Sweden",
+    "registered": "2026-08-05T10:55:17Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen152",
+    "email": "vani.firmansyah660@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDYI.6GrM.MEQCIEoTmJDctLGaDQas0zQ2txuTF18xwoKHM9Dyv0FTuwiQAiBb70UNhHVkbkG8pgRDO6MU3NC2YY_XMkNnK15Ad7Ug_A",
+    "country": "Italy",
+    "registered": "2026-08-05T10:56:20Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen153",
+    "email": "toni.supriadi115@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDXI.0Wzl.MEUCIQCgD6VVvwhHVjLynkrOtOzKCgbNTXofc0aRMmgYIQMv1QIgaWMvLv-ZxAZc6-QPNaimJy5uTP52OaYx51DOZeZEHg4",
+    "country": "United States",
+    "registered": "2026-08-05T10:57:24Z",
+    "status": "ok"
+  },
+  {
+    "slot": "Qwen154",
+    "email": "prilly.latuconsina545@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDXR.WyqB.MEQCIDohkZ4Os6DozhinbhLAHJclM8hMjzPULmBzpXWiL6VxAiA8iMckFAcOIyn7zmQWrzMkXExcfQ6aDrKLWrIcMvN6JA",
     "country": "Egypt",
-    "registered": "2026-08-05T00:50:49.028535",
+    "registered": "2026-08-05T10:58:30Z",
     "status": "ok"
   },
   {
-    "slot": "",
-    "email": "sebastian.flo410@hafizhmuzani.my.id",
-    "key": "sk-ws-H.DMDDRRR.zvyp.MEUCICnBzY4DnksGhAIZqoT-IP-ZxEwK7qMVZG7xYSLXs90DAiEAvruYqVeXE5acqweYAngApHyzxlqIK_3ZUa524mLNNoM",
-    "country": "Morocco",
-    "registered": "2026-08-04T18:51:48Z",
+    "slot": "Qwen155",
+    "email": "abdul.gofur365@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRDXY.gfnh.MEYCIQDWSE5shlloEU8kCqJhKx_lolAVhhariECv9_gp8Wde0QIhAIWh77meWre3CEs77FZuMAxocDvvpQ3JL-aMpTIufRLI",
+    "country": "Singapore",
+    "registered": "2026-08-05T10:59:35Z",
     "status": "ok"
   },
   {
-    "slot": "",
-    "email": "george.young728@hafizhmuzani.my.id",
-    "key": "sk-ws-H.DMDDRYY.xtoZ.MEUCIQDAhZOWzDb9_DKt9kvjceige2en1lyYQccunpwcz-dulgIgUcVX4QZkd4IBqXmJNEHewANClaIOGjL7CEGNFu4plWo",
-    "country": "France",
-    "registered": "2026-08-04T18:56:37Z",
+    "slot": "Qwen156",
+    "email": "surya.saputra385@hafizhmuzani.my.id",
+    "key": "sk-ws-H.DMDRHMD.CCRe.MEYCIQCddsmQtMEYDb1olKQ1wBTdCDg54GqNjPzmvPsTGSY4XQIhAJirUHTExu_F_MXFk-qfYHPQ-QCQwrhhO3qUWNoLVDmK",
+    "country": "Finland",
+    "registered": "2026-08-05T11:00:39Z",
     "status": "ok"
   }
 ];
@@ -1228,6 +1484,13 @@ let searchQuery = '';
 let liveMode = localStorage.getItem('qc_live') === '1';
 let statusFilter = localStorage.getItem('qc_status') || 'all';
 let activeAccounts = [...ACCOUNTS]; // mutable copy for live mode
+document.getElementById('statTotal').textContent = TOTAL;
+document.getElementById('stat-active').textContent = TOTAL;
+document.getElementById('stat-quota').textContent = (TOTAL) + 'M tokens';
+document.getElementById('stat-quota-sub').textContent = '1M free/model × ' + TOTAL + ' accounts';
+document.title = 'QwenCloud Monitor — ' + TOTAL + ' Accounts';
+const TITLE_COUNT = document.getElementById('hdrCount');
+if (TITLE_COUNT) TITLE_COUNT.textContent = TOTAL + ' Accounts';
 
 // Load saved test results
 try {
@@ -1401,7 +1664,7 @@ function renderTable() {
     if (activeArrow) activeArrow.textContent = sortAsc ? '▲' : '▼';
 
     html += `<tr>
-      <td class="col-slot" style="font-weight:600;color:var(--accent)">Qwen${a.slot}</td>
+      <td class="col-slot" style="font-weight:600;color:var(--accent)">${a.slot}</td>
       <td class="col-email" title="${a.email}">${maskEmail(a.email)}</td>
       <td class="col-key" title="${showK ? a.key : 'Click Show Keys to reveal'}">
         ${keyDisplay}
@@ -1419,6 +1682,7 @@ function renderTable() {
   }
   tbody.innerHTML = html;
 
+  document.getElementById('hdrCount').textContent = TOTAL + ' Accounts';
   document.getElementById('filter-count').textContent =
     data.length < TOTAL ? `${data.length} / ${TOTAL} shown` : `${TOTAL} accounts`;
 
