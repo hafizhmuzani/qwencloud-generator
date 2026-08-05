@@ -21,3 +21,6 @@ Thumbs.db
 
 tempmail_state.json
 email_list.txt
+
+# Local backups
+backups/
