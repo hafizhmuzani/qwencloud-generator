@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QwenCloud Monitor — 80 Accounts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0f1a;--bg2:#111827;--bg3:#1a2236;--border:#1e293b;
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+  --accent:#38bdf8;--accent2:#0ea5e9;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;
+  --row-h:34px;--row-h2:24px;
+}
+html{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);font-size:13px;line-height:1.4}
+body{padding:16px 20px;min-width:1200px}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;gap:16px;flex-wrap:wrap}
+.header h1{font-size:18px;font-weight:600;color:#fff;white-space:nowrap}
+.header h1 span{color:var(--accent);font-family:monospace}
+.header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* STAT CARDS */
+.stats{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;min-width:160px;flex:1}
+.stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px}
+.stat-card .value{font-size:22px;font-weight:700;font-family:monospace;color:#fff}
+.stat-card .value.accent{color:var(--accent)}
+.stat-card .sub{font-size:11px;color:var(--text3);margin-top:2px;font-family:monospace}
+
+/* TOOLBAR */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.toolbar input[type=text]{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:6px 10px;font-size:12px;width:240px;outline:none;
+}
+.toolbar input:focus{border-color:var(--accent)}
+.toolbar select{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  border-radius:4px;padding:6px 8px;font-size:12px;outline:none;cursor:pointer;
+}
+.btn{
+  background:var(--bg3);border:1px solid var(--border);color:var(--text2);
+  border-radius:4px;padding:5px 12px;font-size:11px;cursor:pointer;
+  font-family:inherit;transition:all .15s;white-space:nowrap;
+}
+.btn:hover{border-color:var(--accent);color:var(--text)}
+.btn.primary{background:var(--accent);color:#000;border-color:var(--accent);font-weight:600}
+.btn.primary:hover{background:var(--accent2)}
+.btn.danger{border-color:var(--red);color:var(--red)}
+.btn.danger:hover{background:var(--red);color:#fff}
+.btn.active{background:var(--accent);color:#000;border-color:var(--accent)}
+
+/* PROGRESS */
+.progress-bar{width:100%;height:3px;background:var(--bg3);border-radius:2px;margin-top:8px;overflow:hidden;display:none}
+.progress-bar .fill{height:100%;background:var(--accent);width:0%;transition:width .3s}
+
+/* TABLE */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:6px;overflow:auto;max-height:calc(100vh - 280px)}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead{position:sticky;top:0;z-index:2}
+th{
+  background:var(--bg3);border-bottom:1px solid var(--border);
+  padding:0 8px;text-align:left;font-size:10px;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--text3);font-weight:600;
+  height:var(--row-h);cursor:pointer;user-select:none;white-space:nowrap;
+}
+th:hover{color:var(--text)}
+th .sort-arrow{color:var(--accent);margin-left:4px;font-size:9px}
+td{
+  border-bottom:1px solid rgba(30,41,59,.5);
+  padding:0 8px;font-size:12px;height:var(--row-h);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-family:monospace;font-size:11px;
+}
+tr:hover td{background:rgba(56,189,248,.04)}
+
+/* DENSITY */
+.dense td,.dense th{height:var(--row-h2)}
+
+/* COLUMN WIDTHS */
+.col-slot{width:60px}
+.col-email{width:220px}
+.col-key{width:140px}
+.col-country{width:100px}
+.col-updated{width:150px}
+.col-status{width:70px}
+.col-tested{width:100px}
+.col-actions{width:90px}
+
+/* STATUS BADGES */
+.badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;font-family:monospace}
+.badge.ok{background:rgba(34,197,94,.15);color:var(--green)}
+.badge.fail{background:rgba(239,68,68,.15);color:var(--red)}
+.badge.pending{background:rgba(245,158,11,.15);color:var(--amber)}
+.badge.http-code{font-size:9px;padding:0 4px;margin-left:4px;background:rgba(239,68,68,.1);color:var(--red);border-radius:2px}
+
+/* COPY BTN */
+.copy-btn{
+  background:none;border:1px solid var(--border);color:var(--text3);
+  border-radius:3px;padding:1px 6px;font-size:10px;cursor:pointer;font-family:inherit;
+}
+.copy-btn:hover{border-color:var(--accent);color:var(--text)}
+.copy-btn.copied{border-color:var(--green);color:var(--green)}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--green);
+  color:var(--green);padding:8px 16px;border-radius:4px;font-size:12px;font-family:monospace;
+  opacity:0;transform:translateY(10px);transition:all .2s;pointer-events:none;z-index:100;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+
+/* KEY DISPLAY */
+.key-part{color:var(--text2)}
+.key-hidden{color:var(--text3)}
+
+/* RESPONSIVE COLUMNS @1200 */
+@media(max-width:1400px){
+  .col-key{width:120px}
+  .col-email{width:180px}
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>QwenCloud Monitor — <span>57 Accounts</span></h1>
+  <div class="header-right">
+    <span style="color:var(--text3);font-family:monospace;font-size:11px">Generated: 2026-08-05 13:57:06</span>
+    <button class="btn" onclick="showCurlSnippet()" title="Show PowerShell command to regenerate this dashboard">↻ Regenerate Snippet</button>
+  </div>
+</div>
+
+<div class="stats" id="stats">
+  <div class="stat-card">
+    <div class="label">Total Accounts</div>
+    <div class="value accent">57</div>
+    <div class="sub">hafizhmuzani.my.id fleet</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Active Keys</div>
+    <div class="value" id="stat-active">57</div>
+    <div class="sub">last verified on registration</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Tested OK</div>
+    <div class="value" id="stat-tested" style="color:var(--green)">0</div>
+    <div class="sub">live health checks passed</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Tested Fail</div>
+    <div class="value" id="stat-failed" style="color:var(--red)">0</div>
+    <div class="sub">returned errors</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Quota</div>
+    <div class="value" style="font-size:18px">57M tokens</div>
+    <div class="sub">1M free/model × 57 accounts</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Last Batch</div>
+    <div class="value" style="font-size:14px;font-family:monospace" id="stat-batch">2026-08-05</div>
+    <div class="sub">all registered same day</div>
+  </div>
+</div>
+
+<div class="progress-bar" id="progress">
+  <div class="fill" id="progress-fill"></div>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="🔍 Filter by email..." oninput="renderTable()">
+  <select id="sort" onchange="renderTable()">
+    <option value="slot">Sort: Slot #</option>
+    <option value="email">Sort: Email</option>
+    <option value="country">Sort: Country</option>
+    <option value="updated_at">Sort: Date</option>
+  </select>
+  <button class="btn" id="densityBtn" onclick="toggleDensity()">⊞ Compact</button>
+  <button class="btn" id="showKeyBtn" onclick="toggleKeys()">🔑 Show Keys</button>
+  <div style="flex:1"></div>
+  <button class="btn primary" onclick="testAll()">⚡ Test All Keys</button>
+  <button class="btn danger" onclick="copyAllCurl()">📋 Copy All Curl</button>
+  <span id="filter-count" style="color:var(--text3);font-family:monospace;font-size:11px"></span>
+</div>
+
+<div class="table-wrap" id="table-wrap">
+<table>
+<thead>
+<tr>
+  <th class="col-slot" onclick="sortBy('slot')">Slot <span class="sort-arrow" id="sort-slot">▲</span></th>
+  <th class="col-email" onclick="sortBy('email')">Email <span class="sort-arrow" id="sort-email"></span></th>
+  <th class="col-key" onclick="sortBy('key')">API Key <span class="sort-arrow" id="sort-key"></span></th>
+  <th class="col-country" onclick="sortBy('country')">Country <span class="sort-arrow" id="sort-country"></span></th>
+  <th class="col-updated" onclick="sortBy('updated_at')">Registered <span class="sort-arrow" id="sort-updated_at"></span></th>
+  <th class="col-status">Status</th>
+  <th class="col-tested">Last Tested</th>
+  <th class="col-actions">Actions</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- MODAL for curl snippet -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:center;justify-content:center" onclick="closeModal()">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px;max-width:700px;width:90%;max-height:70vh;overflow:auto" onclick="event.stopPropagation()">
+    <h3 style="margin-bottom:10px;color:#fff;font-size:14px">Regenerate Dashboard (PowerShell)</h3>
+    <pre style="background:var(--bg);padding:12px;border-radius:4px;font-size:11px;color:var(--accent);overflow-x:auto;white-space:pre-wrap;border:1px solid var(--border)" id="modal-code"></pre>
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn primary" onclick="copyModalCode()">Copy to Clipboard</button>
+      <button class="btn" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== DATA ==========
+const ACCOUNTS = [
+{
+"slot": "Qwen3",
+"email": "sebastian.flo410@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDRRR.zvyp.MEUCICnBzY4DnksGhAIZqoT-IP-ZxEwK7qMVZG7xYSLXs90DAiEAvruYqVeXE5acqweYAngApHyzxlqIK_3ZUa524mLNNoM",
+"country": "Morocco",
+"registered": "2026-08-04T18:51:48Z",
+"status": "ok"
+},
+{
+"slot": "Qwen4",
+"email": "george.young728@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDRYY.xtoZ.MEUCIQDAhZOWzDb9_DKt9kvjceige2en1lyYQccunpwcz-dulgIgUcVX4QZkd4IBqXmJNEHewANClaIOGjL7CEGNFu4plWo",
+"country": "France",
+"registered": "2026-08-04T18:56:37Z",
+"status": "ok"
+},
+{
+"slot": "Qwen5",
+"email": "charlotte.walker674@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDEYM.iDd4.MEQCIHEEHr5AsXPqPWxUhcQDj7E7b8WkoqeHYawhYgkLcg9vAiA3H51h3ZFL_zmVTqiwoEvSSnSo2cTx_VXQiCZ3b2Vckw",
+"country": "United States",
+"registered": "2026-08-04T19:09:39Z",
+"status": "ok"
+},
+{
+"slot": "Qwen6",
+"email": "hendra.kurniawan405@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDEXI.WvmZ.MEUCIAgms52VNFIagNatLg6NI_fnAciEFkr__h_AicKTE1XkAiEA7PczuQMWVM1DTeS77YzMkb1wgLJ68SCCEPA3Ly7AMAk",
+"country": "United Kingdom",
+"registered": "2026-08-04T19:10:43Z",
+"status": "ok"
+},
+{
+"slot": "Qwen7",
+"email": "liam.hall676@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPMH.3XLb.MEUCIQC4Cn9IL8uVyjfnk5OjMujhbzxozSA7BsIsYAvnuH4eMwIgMMPeHcYv8J8qA73X7ZuhWKjhI2jwsTCyiiETTdbF8QQ",
+"country": "France",
+"registered": "2026-08-04T19:11:47Z",
+"status": "ok"
+},
+{
+"slot": "Qwen8",
+"email": "ida.farida337@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPDD.ZCKY.MEUCIA7PRQ9kPhNZGUIKMNWvKM5ucYCzl7j_Fbne8iigbcHRAiEAlFTD0XVVg4LojZ6gjyHD2KnJsxMw-K_Yt3AU1UWeKMQ",
+"country": "Norway",
+"registered": "2026-08-04T19:12:51Z",
+"status": "ok"
+},
+{
+"slot": "Qwen9",
+"email": "dodi.setiawan485@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPDR.N08O.MEQCIGURED8tJfqZCTeTO-fXwPSnFHVnEfygqoQdu5aoDek1AiAtbNbPURfFciCMa9wdgy0ij1COBreB5Zv9cFyQ2yRvjA",
+"country": "Thailand",
+"registered": "2026-08-04T19:13:53Z",
+"status": "ok"
+},
+{
+"slot": "Qwen10",
+"email": "sebastian.flo263@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPHH.CCwU.MEQCIGTwMT2r-8hKQB5I9zl1hU_8PKeWA4AwASYpWydi8f1lAiB-DsF-18g03l_a42JCflAT-Uf6iGxx1AMTn7EcZZA5yQ",
+"country": "Argentina",
+"registered": "2026-08-04T19:14:59Z",
+"status": "ok"
+},
+{
+"slot": "Qwen11",
+"email": "george.young660@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPIH.ivug.MEYCIQCy8GU-H_VO1-Aeun0QAE_G1zEfpxSjVMGbSEgygYIJMgIhAKqW3QjI5lLy1X19QOVNLyCcNyG9uUhKLCsv47iBntyq",
+"country": "Indonesia",
+"registered": "2026-08-04T19:16:03Z",
+"status": "ok"
+},
+{
+"slot": "Qwen12",
+"email": "putri.marino396@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPIY.qKDp.MEUCIEVFoRSAPMa1GU5JRf-VHwdkYhYkUdzTlcTVYHtPKCq8AiEA74La1NwjDdryGlSHEscL4HqBumawmommwfmjUbeg7MQ",
+"country": "Indonesia",
+"registered": "2026-08-04T19:17:07Z",
+"status": "ok"
+},
+{
+"slot": "Qwen13",
+"email": "kiki.amalia761@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPLI.FBVa.MEYCIQDMZrEoVrnGBp37j_AAlwSE_oVTvTjCgidlSdRDUq5fGQIhAITEJK7hsfUJjWAsoxJ_hGGe5dGeBR5ilj_OuSK_gvy5",
+"country": "Germany",
+"registered": "2026-08-04T19:18:11Z",
+"status": "ok"
+},
+{
+"slot": "Qwen14",
+"email": "hasanuddin.rahman910@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPRY.bceh.MEQCIFi6welQLm8VfaIx56o_sOuftJtRa5nZICkmho8oS42gAiA1ctq01J2sUunxHm4IDyHWcnfaoJj3SVghxFII4lLcRw",
+"country": "Portugal",
+"registered": "2026-08-04T19:20:06Z",
+"status": "ok"
+},
+{
+"slot": "Qwen15",
+"email": "zaskia.adya539@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPEP.YeDV.MEUCIHBpZ_suA3Oi6GKxAEfyy3Q-tjmag76oSUWaDlDg1MXwAiEApze-othucIewpB7uCp70pnl96vwbW46z1NoD8Jp1344",
+"country": "Saudi Arabia",
+"registered": "2026-08-04T19:21:14Z",
+"status": "ok"
+},
+{
+"slot": "Qwen16",
+"email": "ahmad.dhani497@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPPR.e0ox.MEYCIQD9v1YkP4tdYjvGLXzpkR2uRulpF1jqrNaa818ni0sDbwIhAL_qY6vopjhJBCat_Juf6H5JH5Pf_9DdVkTC1HkcKN5r",
+"country": "Poland",
+"registered": "2026-08-04T19:22:28Z",
+"status": "ok"
+},
+{
+"slot": "Qwen17",
+"email": "arya.saloka360@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPYL.OC0Q.MEYCIQDZ4VXESF-saMb-rmndQJYKB0f7WDsfYJllfuT2A_YVjAIhAOlufCA7_L3qbhYEB5ptxJg_xSz1IYFsArepxOYxSi3j",
+"country": "New Zealand",
+"registered": "2026-08-04T19:23:47Z",
+"status": "ok"
+},
+{
+"slot": "Qwen18",
+"email": "ella.wallace798@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPXM.zthX.MEUCIQDdJydurM-6vzYAW4D8wm51lnx7vdnli5DA1hRzVY1VbwIgezosuFEScKk4bp5YKr7UA5vpKzNqMdqKRWg1gkyEue4",
+"country": "Vietnam",
+"registered": "2026-08-04T19:24:53Z",
+"status": "ok"
+},
+{
+"slot": "Qwen19",
+"email": "siti.aminah735@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDPXY.bOc0.MEUCICWmGLoPAi7oza1x-TQAT9OQNMIUz_1I0_K1hqrgAK7sAiEAvlVUJoscRC0rx8x4D6GStmxxowNu-9z1AKQHL358o3w",
+"country": "Norway",
+"registered": "2026-08-04T19:25:57Z",
+"status": "ok"
+},
+{
+"slot": "Qwen20",
+"email": "samuel.hunter101@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYMR.hGzC.MEUCICqGcYM8sIq5TB0qFFq2xYOzrwm7_9I6fTEECBbv84pRAiEA4dNVzz-RQmzxBI0lKeDkNaY1v71A5ghnJxsqhrzv63U",
+"country": "Mexico",
+"registered": "2026-08-04T19:26:59Z",
+"status": "ok"
+},
+{
+"slot": "Qwen21",
+"email": "wina.widiani226@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYDL.cb1P.MEYCIQCBNJGDVRmiQP_d5g0nxMV6zmVqUkaWdjqWWK4-ptq2bAIhAKxO2_TaBG-Hn-X515J0XCPWwXmfyTv-2j4FFcGcEEfc",
+"country": "Portugal",
+"registered": "2026-08-04T19:28:02Z",
+"status": "ok"
+},
+{
+"slot": "Qwen22",
+"email": "luna.maya209@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYHD.5WS2.MEYCIQCrQsr61R0erQ6tMDPf8Cse-Yi9zPhEuWkP7ePln4dydQIhAIWf3AmoKkknYKyDfMPDh_NbuxYhfmvz0uGglWtYSG3m",
+"country": "Romania",
+"registered": "2026-08-04T19:29:05Z",
+"status": "ok"
+},
+{
+"slot": "Qwen23",
+"email": "grace.crawford893@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYIL.adEW.MEUCIQDhE44JI7FUH3eRTO2U2CE-j2d1Y-17uSrnMUYh_oetrQIgJfKYPojRgHhJogyZehI9ikKqPWqQ5H5ay3KAJ0H8uSs",
+"country": "Denmark",
+"registered": "2026-08-04T19:31:00Z",
+"status": "ok"
+},
+{
+"slot": "Qwen24",
+"email": "limas.suryadi501@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYLP.fQ35.MEUCIQCnlkIh5tM9XdBJbH250ZMq80XsiDPgQPA8CpPL6dmCEQIgfa4dIcbre6Gr-zJd09GuNQn1d2D7T5kW86tSWzDYVTc",
+"country": "New Zealand",
+"registered": "2026-08-04T19:32:04Z",
+"status": "ok"
+},
+{
+"slot": "Qwen25",
+"email": "farhan.akbar274@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYRE.EbYH.MEUCIGXFfVsMndZ8kJ-XqY8ChUubpxTqNrzHQD1jlvDilP43AiEAgRkxFsv-6ltPzdm-nY6LAGc0JlAXDnCmTQMJvwakwIQ",
+"country": "South Africa",
+"registered": "2026-08-04T19:33:09Z",
+"status": "ok"
+},
+{
+"slot": "Qwen26",
+"email": "julian.putra967@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYED.cLm5.MEYCIQDvObLKLFusGarDn5lSL1xaPfKX7XhgYjwuBmS7yLb1CwIhAJQPm3cPz44vNJJW-Gn1DC4yaewKUDsBeJe65vR-3qgn",
+"country": "Saudi Arabia",
+"registered": "2026-08-04T19:34:13Z",
+"status": "ok"
+},
+{
+"slot": "Qwen27",
+"email": "farhan.akbar959@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYEE.6Ymm.MEQCIGbd-PsTd1kzPZj4t8y9o3lXVBLF-WVGp9eXfZX_odZ2AiB8suTencQPnzliAteQwSz-Ubx4y4RXmZSxjysstbYliA",
+"country": "France",
+"registered": "2026-08-04T19:35:18Z",
+"status": "ok"
+},
+{
+"slot": "Qwen28",
+"email": "yusri.amanda974@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYPM.fhH4.MEYCIQDQWkzMhR2oXTYtWxUZ6o2DvmaVapS9lob3JuzrZi648gIhAOY08rV7i1Tungw1bG1d4DuDOCIRXnE0ryDolK9Ql2-3",
+"country": "Thailand",
+"registered": "2026-08-04T19:36:23Z",
+"status": "ok"
+},
+{
+"slot": "Qwen29",
+"email": "ahmad.dhani472@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYPE.iYL1.MEYCIQCKyOTDscDEpb_Q-zzlzDNX4RsGLcD7k73LIjrSWX9QaQIhAMAp7uT-Rm72lWlc3_MZaAba-SpG_wGEETamZy2VB1jZ",
+"country": "Egypt",
+"registered": "2026-08-04T19:37:25Z",
+"status": "ok"
+},
+{
+"slot": "Qwen30",
+"email": "bambang.pamungkas845@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYPY.VRUo.MEQCIH_57yR4OEkAQhIIkNpS2VKQc0u5_gVbG4YsFS4Gk47tAiAvG77ObyV6Y6CkWNEKkrjF_tXezh8KD2c5q7VgAtWq1Q",
+"country": "Chile",
+"registered": "2026-08-04T19:38:28Z",
+"status": "ok"
+},
+{
+"slot": "Qwen31",
+"email": "muhammad.rizky919@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYYD.opbP.MEUCIQD5dEieG72RnIkv28iG6a_KH1SaZg5rfP8odDjwzXvCvQIgcZqpJ-HRMfldFQ4nHJWAU11abgD7AuF3CPZXm3JCXLA",
+"country": "Sweden",
+"registered": "2026-08-04T19:39:33Z",
+"status": "ok"
+},
+{
+"slot": "Qwen32",
+"email": "luthfi.hadiansyah618@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYYR.GD8x.MEUCICONVaN5UG7Y8OYjlA-23SbpWxzjH8t96cW93Y0KBS5NAiEAg04WroBYMNZHbR7xNcDB41eRts9MJs3CIgfwXRDXQuw",
+"country": "South Africa",
+"registered": "2026-08-04T19:40:38Z",
+"status": "ok"
+},
+{
+"slot": "Qwen33",
+"email": "cinta.laura110@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYYP.u9ec.MEQCIC5vBpt6Tmt4-s3pWrnBcbGbUwZRkuC3Aou1q1U2ndCLAiAsCghdBoiVdBce1Jdcwu0zJQ4ClZDZiqRlYB-3kE_c1A",
+"country": "Thailand",
+"registered": "2026-08-04T19:41:43Z",
+"status": "ok"
+},
+{
+"slot": "Qwen34",
+"email": "beni.sanjaya804@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYXD.tmNd.MEYCIQCUFyL8pY8srrvKoEASRLxIZ-vddGwpUL3y2EH2DAc8bAIhAMVnX4UvgYzso_szHlktE1VJkn4sft2rJ0OQv7O1lQkk",
+"country": "Greece",
+"registered": "2026-08-04T19:42:44Z",
+"status": "ok"
+},
+{
+"slot": "Qwen35",
+"email": "desy.ratnasari988@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYXI.L5eN.MEUCIQD8UM8R5SXFXuJcrtqaSxqw4KWJ9cLlt4m5BGQhzfuRKwIgIZm3_b5KANWIEx3sm_WxoMsPckC40mV159fNm_UMS-c",
+"country": "Norway",
+"registered": "2026-08-04T19:43:48Z",
+"status": "ok"
+},
+{
+"slot": "Qwen36",
+"email": "farhan.akbar802@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYXR.NQa4.MEQCICdZqtRnH17YXPAG8E-xs8L9m5JcOW20gNWqAneXWwJOAiBMMJbuuc02STDXf8DUmR1W8oN-54INTzW0fSpEn92HZA",
+"country": "Peru",
+"registered": "2026-08-04T19:45:01Z",
+"status": "ok"
+},
+{
+"slot": "Qwen37",
+"email": "alice.thompson992@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDYXX.F8DE.MEYCIQCn7P8gPWI3WzTX2gGuiy9hTcA2KsOB05psJgSATRKG-QIhAPNp11IhS7PeeCXUvN2VbZLcVfoBzSbb0PYXTLf7wvwt",
+"country": "Greece",
+"registered": "2026-08-04T19:46:15Z",
+"status": "ok"
+},
+{
+"slot": "Qwen38",
+"email": "oliver.woods429@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXMH.l0TQ.MEYCIQCAzjZ6CJUZpI89laOVROEsLe8GfOV3PCXEj5k3tIoBAgIhAJOHL6e6dMK0ZDJignBAmu8-tjXbGxDBTeHpISg_9iPk",
+"country": "Malaysia",
+"registered": "2026-08-04T19:47:18Z",
+"status": "ok"
+},
+{
+"slot": "Qwen39",
+"email": "nina.zulkarnaen390@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXML.OkPn.MEUCIC6NjEM_hj1oXYTz3UKfcMlznUtRj0a6ylbwi08tBcX9AiEAiI8HNCS36M9geR3in4im-kQc8K7SCriC5YylPEsYOW8",
+"country": "Colombia",
+"registered": "2026-08-04T19:48:22Z",
+"status": "ok"
+},
+{
+"slot": "Qwen40",
+"email": "farhan.akbar293@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXMP.VKFP.MEUCIQCwp_YAZKK1OuYAR8ZNmB4Hl4O2iQX87oampsQ4Zc46dwIgQ7jwBdgEdixyI0zNdPC9nHheFE1A5x_teQMeA8Mgmgw",
+"country": "New Zealand",
+"registered": "2026-08-04T19:49:24Z",
+"status": "ok"
+},
+{
+"slot": "Qwen41",
+"email": "riko.pratama231@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXDD.7IWk.MEUCIQDqbg3xdiNV1SzImpeiIcOgl7VYjiG_F8n1Y3GzepNnTQIgVsNFELHbWK2qnLIm8urFJeMsIPsY4xwQaARl4o9t5Gs",
+"country": "Singapore",
+"registered": "2026-08-04T19:50:29Z",
+"status": "ok"
+},
+{
+"slot": "Qwen42",
+"email": "ida.farida961@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXDP.xpVG.MEQCIHbaTkT4v8lxxna3Ps08P6cyrTPoeKAPLB2KjFkGLSI3AiAflKiUzwGgeUKkPIIafeD7ZIhdTZbRzhqroVg1u6YZ8A",
+"country": "New Zealand",
+"registered": "2026-08-04T19:51:34Z",
+"status": "ok"
+},
+{
+"slot": "Qwen43",
+"email": "ida.farida607@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXDX.CRj1.MEYCIQD07svtcUdiwXBIkCsB0o9HP0GGED2P-o_7UD7while0AIhAOtc4hyEPUq1rq4xlR7UhfbPeAQUrRwyQbH70m41EnhG",
+"country": "Egypt",
+"registered": "2026-08-04T19:52:40Z",
+"status": "ok"
+},
+{
+"slot": "Qwen44",
+"email": "kevin.lilipaly642@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXHH.8I3d.MEQCIG_CSt5xMSlVq8bUHKXBm1n0l2BtP6hBwJ-F-ufVS1pNAiBKyi7NnwMss9pe2hyveFaPDkGBYjFpYXwfg-s5UaBEjA",
+"country": "Denmark",
+"registered": "2026-08-04T19:53:42Z",
+"status": "ok"
+},
+{
+"slot": "Qwen45",
+"email": "henry.lee899@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXHL.m4Cp.MEQCIBlmOUNqePXV9MfawkYQmKhW2bP2ZxnMJ6Qq9jUxqGjiAiBT6r2zBrVhmdcgDkHRsRWDrUKmb7twDbU5cT2m2a-4XA",
+"country": "Brazil",
+"registered": "2026-08-04T19:54:47Z",
+"status": "ok"
+},
+{
+"slot": "Qwen46",
+"email": "toni.supriadi953@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXIM.o1fC.MEUCIQD5836iDrtX5dO47sTLa79qMMOdhitIM6qTY86DWp0HRwIgSUBHn4D9SERqNYsk3EwDMb8bF1xw6GPd0HOLsr2Hytc",
+"country": "Italy",
+"registered": "2026-08-04T19:55:51Z",
+"status": "ok"
+},
+{
+"slot": "Qwen47",
+"email": "robert.kelly528@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXIH.xkfV.MEQCIF1189MtOHQAXoteczpy8xYK7NBNN-R67D2pswLxcSMUAiBrAwem9XY3WxccodxCW67sCJIJLdA01KBogL3wMNk1lQ",
+"country": "Germany",
+"registered": "2026-08-04T19:57:00Z",
+"status": "ok"
+},
+{
+"slot": "Qwen48",
+"email": "kirana.larasati467@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXIR.HRjC.MEYCIQDf29t0al1cF2a1pNATJM-7vcoocrqspSRV-VPw_yF7nQIhAO5k-L3PEsWVjiq2BAIDHlFLJYKio6m0ospRApjwBPsz",
+"country": "United Kingdom",
+"registered": "2026-08-04T19:58:04Z",
+"status": "ok"
+},
+{
+"slot": "Qwen49",
+"email": "zaskia.adya607@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXIX.t4Nj.MEUCIQD9nHHizcV2leLqOo7TpRI2DtApwdTssOiRtBSyO693bwIgBwaiBnvTvoKTNigR_kOY_L_cyPfURr9zfHl4cFCON40",
+"country": "Croatia",
+"registered": "2026-08-04T19:59:07Z",
+"status": "ok"
+},
+{
+"slot": "Qwen50",
+"email": "maria.taufik296@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXLE.cq6D.MEUCIQDcQIVKQv4bMfU_KDNxGEsKv29FD77sK9zNEoGt4JCaHwIgTYttoDTC6znGxjzCmYOmGi8pGIvx5g0SVnzK55Bkh4o",
+"country": "Portugal",
+"registered": "2026-08-04T20:00:12Z",
+"status": "ok"
+},
+{
+"slot": "Qwen51",
+"email": "surya.saputra414@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXRH.b7X8.MEQCIAJe5CyMHN5fvYuxNL1SLxuaYb6MrvgErZt_oA0_U9fdAiALT_w3d-afBuQQgJF8YLlGGrQ1ts-u9xgQWWZ9qmstRw",
+"country": "Indonesia",
+"registered": "2026-08-04T20:01:15Z",
+"status": "ok"
+},
+{
+"slot": "Qwen52",
+"email": "james.harrison320@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXEX.4Qh0.MEYCIQD0-4xVcI4nuo6xx0MaZ4kSQeUA6IpEet_TZyZQk81-HAIhALT8uamOaI0-vZW4ZU93SttH7eHdtd2N098vke1PgHo-",
+"country": "Argentina",
+"registered": "2026-08-04T20:02:17Z",
+"status": "ok"
+},
+{
+"slot": "Qwen53",
+"email": "putri.sari539@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXPL.l4gJ.MEUCIBnLosYCc6Ji3HbhNDkhxXqLMj3B9FnjsjLJT5S0YrQgAiEAnBga9R89AqZTjYj5btMw_imDaHgDPmRKnSAwkixuJy0",
+"country": "Australia",
+"registered": "2026-08-04T20:03:19Z",
+"status": "ok"
+},
+{
+"slot": "Qwen54",
+"email": "siti.aminah970@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDXPY.E6mp.MEUCIHhehDNVUz6q_CgGEhsbH9xzfGiZzaJqz_VCFGsbpc-CAiEA0ONClnjZtQKPUBq6ZRI5H9ibqLE8Tce006Osv6vZ7OM",
+"country": "Norway",
+"registered": "2026-08-04T20:04:20Z",
+"status": "ok"
+},
+{
+"slot": "Qwen55",
+"email": "prilly.latuconsina670@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMHL.bZnw.MEUCIQDgDUYDfugSZhloOyA_gBFi1W0kJOsNUaYDYK4UmekRuAIgHaB4EfZjWXJErWqKuB8_RUz1FnGKc05pusFXHQWo2ck",
+"country": "Sweden",
+"registered": "2026-08-05T06:55:29Z",
+"status": "ok"
+},
+{
+"slot": "Qwen56",
+"email": "oscar.lawalata284@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMIM.K7zz.MEYCIQD3p_dAqtXdUFZTSTS-552vHJvi1wWAXdsasGW6u9v7awIhALzL3nZ7M2Mk5pD7isZt-NbZYqmNxkeVh1vEYFhuXkI_",
+"country": "Switzerland",
+"registered": "2026-08-05T06:56:33Z",
+"status": "ok"
+},
+{
+"slot": "Qwen57",
+"email": "david.sullivan530@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMIY.7R2Y.MEUCIQCA5mYGzt25nd6iztm3j658iiT08-vll7hxl7ShCKUXOwIgEKxM5ScnRf53bCUrbPg-BlbEryZuyfVEnqN_trUo_TU",
+"country": "Indonesia",
+"registered": "2026-08-05T06:57:36Z",
+"status": "ok"
+},
+{
+"slot": "Qwen58",
+"email": "kevin.lilipaly499@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMLI.M3f7.MEYCIQDd7FoRvT3oFh4mHsPuh2oENpGx2POMPY2smUS5wRP7CQIhAMeW543GitA1WzV_eKgSPiSeeLeScAda9d24GaLyAmfm",
+"country": "Portugal",
+"registered": "2026-08-05T06:58:40Z",
+"status": "ok"
+},
+{
+"slot": "Qwen59",
+"email": "nadhira.putri343@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMRH.reSp.MEQCIEgEZ8fvpUpKZVrPzA6Ri88A-VyELdDUPoXqF9y-sAMVAiAfoSjOjQ6xGV1hsI3V2FJGfYAfzwqc62Dkd-HDZLEztg",
+"country": "Denmark",
+"registered": "2026-08-05T06:59:44Z",
+"status": "ok"
+},
+{
+"slot": "Qwen60",
+"email": "ava.king457@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMRY.TH24.MEQCIHH7Q_al7yQPI6UFoMjXjpAljb0kEwfXJSJucS1qxpn5AiAmpoXFSe21jEZnmm7Z98LQ4snmq0o9EyYWvZlPwd8Gmw",
+"country": "Norway",
+"registered": "2026-08-05T07:00:48Z",
+"status": "ok"
+},
+{
+"slot": "Qwen61",
+"email": "chris.salman726@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMEI.fk33.MEYCIQDRHNqEiIbYVCcG6OKXeHCXcmgQJvzx8MUXeCMKbaF40gIhAJ9r8m8XvAWyEZ8LdN-DdaxrFrdW3kXHfDuT7C1wuXwI",
+"country": "Poland",
+"registered": "2026-08-05T07:01:53Z",
+"status": "ok"
+},
+{
+"slot": "Qwen62",
+"email": "siti.aminah462@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMYH.So5K.MEQCIGed0I28Zn-eBZkdUG2HI0EJHGMXqvnkrjbbDTtwqe11AiAg4vHMixrtfbePF8n4VGdvytkQiuyDdn-W9y4cge6ZWw",
+"country": "United States",
+"registered": "2026-08-05T07:02:58Z",
+"status": "ok"
+},
+{
+"slot": "Qwen63",
+"email": "nagita.slavina539@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMYI.fMO0.MEUCIDCq0I5C3uARQLsPtHpFrLadfsS1kIH3TRFg32BkSeu2AiEAw11ZF5ceJD4i7Xf_bKZ5ZS3sd5ck0_eWS4hloZJSx70",
+"country": "Colombia",
+"registered": "2026-08-05T07:04:01Z",
+"status": "ok"
+},
+{
+"slot": "Qwen64",
+"email": "emily.grant573@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMXD.8etQ.MEUCIQD_AMsgJZc1FLdooxSKmwpejwVfEa-HGenJiM21ACssdgIgRTpkABndy4ndYInBP8S-YvpAyg6h63mtyHdKel2R6Ss",
+"country": "Canada",
+"registered": "2026-08-05T07:05:04Z",
+"status": "ok"
+},
+{
+"slot": "Qwen65",
+"email": "titi.kamal520@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMXL.z0Le.MEUCIBSNPVP3TdJzmlVOTCs-mtAnJrlCVaUMSiuSl6So0ld4AiEAk7Kc3Xi0ZnXz8CsoaWUqP_QFn0Q11_0BGBnH7vH24oQ",
+"country": "United Kingdom",
+"registered": "2026-08-05T07:06:07Z",
+"status": "ok"
+},
+{
+"slot": "Qwen66",
+"email": "tasya.kamila991@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLMXX.yfRk.MEUCICSIFEhfhpBQb87nMAdixSNd7NcC_xlCo2BB7e3CFk2-AiEAiIs9Bj8Sl1Co-HireMhJzrjUXTuG3r7cPUX5X3NOJpY",
+"country": "Morocco",
+"registered": "2026-08-05T07:07:16Z",
+"status": "ok"
+},
+{
+"slot": "Qwen67",
+"email": "desy.ratnasari173@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDMH.OWAL.MEYCIQC5NlqPmngwWLeE88CY9shFHgb2oMRVxMtz32W662qYXQIhAITjcRtLKxrIjKeaZYBFcBapn70N3lwxuzVy8ouyvyRB",
+"country": "Canada",
+"registered": "2026-08-05T07:08:18Z",
+"status": "ok"
+},
+{
+"slot": "Qwen68",
+"email": "joko.widodo530@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDME.Xfu5.MEUCIAltngFPc67nEhNf_9fxtUbHkNPFqe0UaactyVLFRU10AiEAriVCto9d0ZgD6kWGAlGSalQAF99PLdghGPIp9nXGao8",
+"country": "Switzerland",
+"registered": "2026-08-05T07:09:21Z",
+"status": "ok"
+},
+{
+"slot": "Qwen69",
+"email": "ahmad.dhani207@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDDD.2jFm.MEQCIHzok0AQdpG08ilk2TNqt2NMhDoBTumBmfw_SNzLKj5BAiBfSCB7a2xffugOwThhkuPIkkZwe-AxCIXw00Q_O_zz-g",
+"country": "Turkey",
+"registered": "2026-08-05T07:10:24Z",
+"status": "ok"
+},
+{
+"slot": "Qwen70",
+"email": "riko.pratama398@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDDR.dqHz.MEYCIQD468FwmeITac55do7azkEceJauR6wmzDvLFwDzl8uEmQIhAKUNaBayHUkd4X7HzWHxRGZxQBT4ohjghIsBUG4rXwaq",
+"country": "South Africa",
+"registered": "2026-08-05T07:11:29Z",
+"status": "ok"
+},
+{
+"slot": "Qwen71",
+"email": "aisyah.nurul284@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDHL.mIUu.MEYCIQCdAThEzlvvUROAW4eo8G_FPHmIaYFOov_K7tRpLGhC1QIhAPW6GC6B52V2fcaEr_n0yaS9uHl0Zf8YEElOU5E_FWxD",
+"country": "Egypt",
+"registered": "2026-08-05T07:12:33Z",
+"status": "ok"
+},
+{
+"slot": "Qwen72",
+"email": "riko.pratama446@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDID.hi8V.MEYCIQDshwjjmeUZbBfp5dlt_9pUA2wCYF62QYH7qr8-HpY36gIhANWbfj3mvmxYdrF-0zMhN786SVyKOOxdLQkG1YB13o7I",
+"country": "United Kingdom",
+"registered": "2026-08-05T07:13:36Z",
+"status": "ok"
+},
+{
+"slot": "Qwen73",
+"email": "fatimah.azzahra995@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDIL.2FCF.MEQCIArIun4Y-YnFyZsPSofDwLp-ewTcSTKDxfgUPtCeFFQ6AiADX3gDi1y4dAl5tzmmVISTzgtN2DY2u9F1S5Ou6D1WTA",
+"country": "United Kingdom",
+"registered": "2026-08-05T07:14:41Z",
+"status": "ok"
+},
+{
+"slot": "Qwen74",
+"email": "glenn.fredly219@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDIY.aIcM.MEUCIQCBVM0XIoVCtB9KzVev_nLqra-nC0ZijtjapGXil3W0YAIgR6YTH7mR8yloirH3m3l_OUaDka8gRJHfPp4gRCJUQEQ",
+"country": "Mexico",
+"registered": "2026-08-05T07:15:44Z",
+"status": "ok"
+},
+{
+"slot": "Qwen75",
+"email": "titi.kamal172@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDLH.J0yr.MEQCIHv7lNgtrSyHdTValfI_Yg0oy8uofhbHgtUhDIsFYnNyAiAFEcTvWAIL1Ul4FBdD2t_sOuXLWjSHpNomygfSvNyVpw",
+"country": "Australia",
+"registered": "2026-08-05T07:16:49Z",
+"status": "ok"
+},
+{
+"slot": "Qwen76",
+"email": "elma.vananu146@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDLP.KZUy.MEYCIQC_mCQw7mIZPaGuOZ2iJMQmyVqcaOJoZkAmOkzj4XBlLwIhAJOddZ5mC7VpO6A6u6bYspZfHgEgF0i1-NFLsWUfWIDt",
+"country": "Chile",
+"registered": "2026-08-05T07:18:04Z",
+"status": "ok"
+},
+{
+"slot": "Qwen77",
+"email": "taufik.hidayat330@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDRR.GL8q.MEUCIQCgIRGpVqxBidK_HiMBw9iAdI_ryiCpMkEAW-zFaIzsWwIgGIWgN0YFR5a2_aFg7b_E5z6EnQaP-mlTSszbkbA0hEk",
+"country": "Mexico",
+"registered": "2026-08-05T07:19:07Z",
+"status": "ok"
+},
+{
+"slot": "Qwen78",
+"email": "okky.ardyana256@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDRP.z30E.MEYCIQCvg0iux5iqV0o3AG5uQ-8kEbP-mSd7ffYQ3z6STyRVOwIhAIIg5yE7MA1J3-xrCsPpHQMjSV3_8QfF1LtHQPNJqNiK",
+"country": "Ireland",
+"registered": "2026-08-05T07:20:08Z",
+"status": "ok"
+},
+{
+"slot": "Qwen79",
+"email": "mia.cooper456@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDLDEI.nr65.MEUCIG5m0aEajV2Z3pd0XD4kESnEnHCSxWcKeSdTpY4CQg1YAiEA3f34__EKCeP1XqZpE-C0OGqEvUYa2rs9pJAmxXhnCxU",
+"country": "Thailand",
+"registered": "2026-08-05T07:21:09Z",
+"status": "ok"
+},
+{
+"slot": "",
+"email": "david.sullivan300@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDHIM.ItFE.MEUCIE-FxasZZEKwH6uPSZQbt4cEDmGVx7J69sng6uuBQkokAiEAzEWGpjHPp5OGbr12cWIceWjJ8lCwm_19mcZhCAXQQtA",
+"country": "Egypt",
+"registered": "2026-08-05T00:50:49.028535",
+"status": "ok"
+},
+{
+"slot": "",
+"email": "ea.rlyright.22@gmail.com",
+"key": "sk-ws-H.DMDMIDL.TbFl.MEUCIQClbFLx3-osjAcjq2ps30Gua6LJReVXVR9zfV0iBiL80QIgSOIfWsZuh2gimhLG-uqaPadZ-yed5IqxZGijLGkvUWQ",
+"country": "Vietnam",
+"registered": "2026-08-05T00:01:08.749156",
+"status": "ok"
+},
+{
+"slot": "",
+"email": "reni.wulan541@hafizhmuzani.my.id",
+"key": "sk-ws-H.DMDDHHR.V5Sy.MEUCIQCoZpii6DXBI8lbxQxxR8zu9vd49LM5VkPW6FHbw12u8AIgR7rtFAhtuXiBTUb8lhMBpSZHKXDpGPgn6OuQKl-P9LI",
+"country": "Morocco",
+"registered": "2026-08-05T00:49:47.857766",
+"status": "ok"
+}
+];
+const TOTAL = ACCOUNTS.length;
+const ENDPOINT = 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions';
+const MODEL = 'qwen-flash-character';
+
+// ========== STATE ==========
+let testResults = {};  // slot -> {status, code, time}
+let showKeys = false;
+let compact = localStorage.getItem('qc_compact') === '1';
+let currentSort = localStorage.getItem('qc_sort') || 'slot';
+let sortAsc = localStorage.getItem('qc_sort_asc') !== '0';
+let searchQuery = '';
+
+// Load saved test results
+try {
+  const saved = JSON.parse(localStorage.getItem('qc_results') || '{}');
+  testResults = saved;
+} catch(e) { testResults = {}; }
+
+// ========== HELPERS ==========
+function maskEmail(email) {
+  const [local, domain] = email.split('@');
+  if (local.length <= 3) return local[0] + '***@' + domain;
+  return local.slice(0,3) + '***@' + domain;
+}
+
+function maskKey(key) {
+  // sk-ws-H.DMDMIDL.TbFl.MEU...
+  const first16 = key.slice(0, 14);
+  const last6 = key.slice(-6);
+  return first16 + '•••••' + last6;
+}
+
+function formatTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'2-digit'})
+      + ' ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+  } catch(e) { return iso.slice(0,16); }
+}
+
+function timeAgo(iso) {
+  if (!iso) return 'never';
+  const diff = Date.now() - new Date(iso).getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  return Math.floor(diff/86400000) + 'd ago';
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied ✓')).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Copied ✓');
+  });
+}
+
+// ========== SORTING ==========
+function sortBy(field) {
+  if (currentSort === field) {
+    sortAsc = !sortAsc;
+  } else {
+    currentSort = field;
+    sortAsc = true;
+  }
+  localStorage.setItem('qc_sort', field);
+  localStorage.setItem('qc_sort_asc', sortAsc ? '1' : '0');
+  renderTable();
+}
+
+function getSortedData() {
+  let data = [...ACCOUNTS];
+  const q = document.getElementById('search').value.toLowerCase().trim();
+  if (q) {
+    data = data.filter(a => a.email.toLowerCase().includes(q)
+      || a.country.toLowerCase().includes(q)
+      || ('qwen'+a.slot).toLowerCase().includes(q));
+  }
+  data.sort((a, b) => {
+    let va = a[currentSort] || '';
+    let vb = b[currentSort] || '';
+    if (currentSort === 'slot') { va = a.slot; vb = b.slot; return sortAsc ? va-vb : vb-va; }
+    if (currentSort === 'updated_at') { va = a.updated_at||''; vb = b.updated_at||''; }
+    va = String(va).toLowerCase();
+    vb = String(vb).toLowerCase();
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return 0;
+  });
+  return data;
+}
+
+// ========== RENDER TABLE ==========
+function renderTable() {
+  const data = getSortedData();
+  const tbody = document.getElementById('tbody');
+  const showK = showKeys;
+
+  let html = '';
+  for (const a of data) {
+    const r = testResults[a.slot] || {};
+    let statusBadge = '<span class="badge ok">OK</span>';
+    let testedText = '—';
+    if (r.status === 'ok') {
+      statusBadge = '<span class="badge ok">✓ OK</span>';
+      testedText = '<span style="color:var(--green)">' + timeAgo(r.time) + '</span>';
+    } else if (r.status === 'fail') {
+      statusBadge = '<span class="badge fail">✗ FAIL</span>';
+      if (r.code) statusBadge += '<span class="badge http-code">' + r.code + '</span>';
+      testedText = '<span style="color:var(--red)">' + timeAgo(r.time) + '</span>';
+    } else if (r.status === 'checking') {
+      statusBadge = '<span class="badge pending">⏳</span>';
+      testedText = '<span style="color:var(--amber)">testing…</span>';
+    }
+
+    const keyDisplay = showK ? a.key : maskKey(a.key);
+
+    // Sort arrow update
+    const arrowEl = 'sort-' + currentSort;
+    document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+    const activeArrow = document.getElementById(arrowEl);
+    if (activeArrow) activeArrow.textContent = sortAsc ? '▲' : '▼';
+
+    html += `<tr>
+      <td class="col-slot" style="font-weight:600;color:var(--accent)">Qwen${a.slot}</td>
+      <td class="col-email" title="${a.email}">${maskEmail(a.email)}</td>
+      <td class="col-key" title="${showK ? a.key : 'Click Show Keys to reveal'}">
+        ${keyDisplay}
+      </td>
+      <td class="col-country">${a.country}</td>
+      <td class="col-updated" title="${a.updated_at}">${formatTime(a.updated_at)}</td>
+      <td class="col-status">${statusBadge}</td>
+      <td class="col-tested">${testedText}</td>
+      <td class="col-actions">
+        <button class="copy-btn" onclick="copyKey('${a.slot}')" title="Copy full API key">Copy</button>
+        <button class="copy-btn" onclick="testOne(${a.slot})" title="Test this key">Test</button>
+        <button class="copy-btn" onclick="copyCurl(${a.slot})" title="Copy curl command">curl</button>
+      </td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+
+  document.getElementById('filter-count').textContent =
+    data.length < TOTAL ? `${data.length} / ${TOTAL} shown` : `${TOTAL} accounts`;
+
+  // Update sort arrows
+  document.querySelectorAll('.sort-arrow').forEach(el => el.textContent = '');
+  const activeArrow = document.getElementById('sort-' + currentSort);
+  if (activeArrow) activeArrow.textContent = sortAsc ? '▲' : '▼';
+
+  updateStats();
+}
+
+function updateStats() {
+  let ok = 0, fail = 0;
+  for (const k in testResults) {
+    if (testResults[k].status === 'ok') ok++;
+    if (testResults[k].status === 'fail') fail++;
+  }
+  document.getElementById('stat-tested').textContent = ok;
+  document.getElementById('stat-failed').textContent = fail;
+  const active = TOTAL - fail;
+  document.getElementById('stat-active').textContent = active;
+}
+
+// ========== DENSITY ==========
+function toggleDensity() {
+  compact = !compact;
+  localStorage.setItem('qc_compact', compact ? '1' : '0');
+  document.getElementById('densityBtn').classList.toggle('active', compact);
+  document.getElementById('table-wrap').classList.toggle('dense', compact);
+}
+
+function toggleKeys() {
+  showKeys = !showKeys;
+  document.getElementById('showKeyBtn').classList.toggle('active', showKeys);
+  document.getElementById('showKeyBtn').textContent = showKeys ? '🙈 Hide Keys' : '🔑 Show Keys';
+  renderTable();
+}
+
+// ========== CLIPBOARD ==========
+function copyKey(slot) {
+  const a = ACCOUNTS.find(x => x.slot === slot);
+  if (!a) return;
+  copyText(a.key);
+  toast(`Copied Qwen${slot} key ✓`);
+}
+
+function getCurlCommand(slot) {
+  const a = ACCOUNTS.find(x => x.slot === slot);
+  if (!a) return '';
+  return `curl -s -X POST ${ENDPOINT} \
+  -H "Authorization: Bearer ${a.key}" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"$MODEL","messages":[{"role":"user","content":"Hi"}],"max_tokens":10}'`;
+}
+
+function copyCurl(slot) {
+  const cmd = getCurlCommand(slot);
+  copyText(cmd);
+  toast(`Copied Qwen${slot} curl ✓`);
+}
+
+function copyAllCurl() {
+  let cmds = [];
+  for (const a of ACCOUNTS) {
+    cmds.push(`# === Qwen${a.slot} (${maskEmail(a.email)}) ===`);
+    cmds.push(getCurlCommand(a.slot));
+    cmds.push('');
+  }
+  copyText(cmds.join('\n'));
+  toast(`Copied ${TOTAL} curl commands ✓`);
+}
+
+// ========== HEALTH CHECK ==========
+async function testOne(slot) {
+  const a = ACCOUNTS.find(x => x.slot === slot);
+  if (!a) return;
+  testResults[slot] = {status:'checking'};
+  renderTable();
+
+  try {
+    const resp = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + a.key,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{role:'user', content:'Hi'}],
+        max_tokens: 10
+      })
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data.choices && data.choices.length > 0) {
+        testResults[slot] = {status:'ok', code:resp.status, time:new Date().toISOString()};
+      } else {
+        testResults[slot] = {status:'fail', code:'no-choices', time:new Date().toISOString()};
+      }
+    } else {
+      testResults[slot] = {status:'fail', code:resp.status, time:new Date().toISOString()};
+    }
+  } catch(e) {
+    // CORS block or network error — fall back to showing curl
+    testResults[slot] = {status:'fail', code:'CORS', time:new Date().toISOString()};
+  }
+  localStorage.setItem('qc_results', JSON.stringify(testResults));
+  renderTable();
+}
+
+async function testAll() {
+  const CONCURRENCY = 5;
+  const progress = document.getElementById('progress');
+  const fill = document.getElementById('progress-fill');
+  progress.style.display = 'block';
+  fill.style.width = '0%';
+
+  let done = 0;
+  const queue = [...ACCOUNTS];
+
+  async function worker() {
+    while (queue.length > 0) {
+      const a = queue.shift();
+      testResults[a.slot] = {status:'checking'};
+      await testOne(a.slot);
+      done++;
+      fill.style.width = Math.round(done / TOTAL * 100) + '%';
+    }
+  }
+
+  const workers = [];
+  for (let i = 0; i < CONCURRENCY; i++) workers.push(worker());
+  await Promise.all(workers);
+
+  setTimeout(() => { progress.style.display = 'none'; fill.style.width = '0%'; }, 1000);
+  toast(`Tested ${TOTAL} keys ✓`);
+}
+
+// ========== REGENERATE SNIPPET ==========
+function showCurlSnippet() {
+  const snippet = `# PowerShell: Regenerate qwencloud-monitor.html
+# Run this from D:\qwencloud-generator\
+python generate_monitor.py
+# OR manually:
+$json_data = Get-Content accounts.json -Raw | ConvertFrom-Json
+$json_data.PSObject.Properties.Remove('_endpoints')
+$json_data | ConvertTo-Json -Depth 10 | Set-Content _accounts_payload.json
+Write-Host "Regenerate HTML with updated accounts.json data"`;
+  document.getElementById('modal-code').textContent = snippet;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function copyModalCode() {
+  copyText(document.getElementById('modal-code').textContent);
+  toast('Snippet copied ✓');
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+}
+
+// ========== INIT ==========
+// Apply saved density
+if (compact) {
+  document.getElementById('densityBtn').classList.add('active');
+  document.getElementById('table-wrap').classList.add('dense');
+}
+
+// Set initial sort dropdown
+document.getElementById('sort').value = currentSort;
+
+renderTable();
+</script>
+</body>
+</html>
