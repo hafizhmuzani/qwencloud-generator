@@ -188,7 +188,7 @@ def _connect_to_9router(email: str, api_key: str, result: dict) -> None:
         "email": email,
         "name": email,
         "defaultModel": "qwen-flash-character",
-        "testStatus": "pending",
+        "testStatus": "active",
         "providerSpecificData": {
             "prefix": "Qwen",
             "apiType": "chat",
