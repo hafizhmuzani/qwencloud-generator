@@ -996,7 +996,12 @@ def main():
     info(f"QwenCloud bot | email={args.email} | country={country}")
 
     with sync_playwright() as p:
-        browser_args = ["--disable-blink-features=AutomationControlled"]
+        browser_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-web-security",
+            "--disable-site-isolation-trials",
+            "--no-sandbox",
+        ]
         if args.proxy:
             browser = p.chromium.launch(
                 headless=args.headless,
